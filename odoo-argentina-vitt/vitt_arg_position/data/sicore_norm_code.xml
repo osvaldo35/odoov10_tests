@@ -1,13 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <odoo>
     <data noupdate="True">    
-<!--        <record model="sicore.norm.codes" id="arciba_code_1">
+        <record model="sicore.norm.codes" id="arciba_code_1">
             <field name="comment">Art. 64, Anexo I de Res. 939/13 - COMPANIAS DE SEGUROS</field>
             <field name="name">1</field>
             <field name="operation_type">withholding</field>
             <field name="tax_scope">supplier</field>
         </record>
--->
         <record model="sicore.norm.codes" id="arciba_code_2">
             <field name="comment">Ord. 40434 PROVEEDORES GCBA</field>
             <field name="name">2</field>

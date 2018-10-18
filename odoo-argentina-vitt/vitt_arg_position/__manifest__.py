@@ -19,6 +19,6 @@ Considera Operaciones Exentas, No Gravadas y reemplazo de impuestos para Monotri
     'depends': ['account'],
     'data':[
         'data/f_position_arg_data.xml',
-        'data/sicore_norm_code.xml'
+  #      'data/sicore_norm_code.xml'
     ],
 }
