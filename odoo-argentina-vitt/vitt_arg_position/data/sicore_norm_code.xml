@@ -3,7 +3,7 @@
     <data noupdate="True">    
         <record model="sicore.norm.codes" id="arciba_code_1">
             <field name="comment">Art. 64, Anexo I de Res. 939/13 - COMPANIAS DE SEGUROS</field>
-            <field name="name">1</field>
+            <field name="name">"1"</field>
             <field name="operation_type">withholding</field>
             <field name="tax_scope">supplier</field>
         </record>
