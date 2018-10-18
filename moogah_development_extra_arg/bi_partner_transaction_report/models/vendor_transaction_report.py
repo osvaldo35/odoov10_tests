@@ -114,8 +114,8 @@ class report_bi_vendor_transaction(models.AbstractModel):
                     #     amount = cpg.matched_amount
                     # else:
                     #     amount = cpg.unmatched_amount
-                    if cpg.currency_id.id != currency.id and cpg.currency_rate:
-                        amount = amount / cpg.currency_rate
+                    if cpg.currency_id.id != currency.id and cpg.manual_currency_rate:
+                        amount = amount / cpg.manual_currency_rate
                     grand_total_debit += amount
 
                 grand_total_balance = grand_total_debit - grand_total_credit
@@ -158,7 +158,7 @@ class report_bi_vendor_transaction(models.AbstractModel):
                          'reference':inv.name,
                          'debit':debit,
                          'credit':credit,
-                        'currency_rate': inv.currency_rate,
+                        'currency_rate': inv.manual_currency_rate,
                         'amount_in_currency': debit if inv.type == "in_refund" else credit,
                          })
 
@@ -181,8 +181,8 @@ class report_bi_vendor_transaction(models.AbstractModel):
                     amount_in_currency = payment_amount
                     credit = 0.0
 
-                    if cpg.currency_id.id != currency.id and cpg.currency_rate:
-                        debit = debit / cpg.currency_rate
+                    if cpg.currency_id.id != currency.id and cpg.manual_currency_rate:
+                        debit = debit / cpg.manual_currency_rate
 
                     globle_dict_list.append({
                         'obj':cpg,
@@ -193,7 +193,7 @@ class report_bi_vendor_transaction(models.AbstractModel):
                         'reference':cpg.name,
                         'debit':debit,
                         'credit':credit,
-                        'currency_rate': cpg.currency_rate,
+                        'currency_rate': cpg.manual_currency_rate,
                         'amount_in_currency': amount_in_currency,
                         'payment_currency': cpg.currency_id,
                                  })
@@ -351,8 +351,8 @@ class report_bi_vendor_transaction(models.AbstractModel):
                     #     amount = cpg.matched_amount
                     # else:
                     #     amount = cpg.unmatched_amount
-                    if cpg.currency_id.id != currency.id and cpg.currency_rate:
-                        amount = amount / cpg.currency_rate
+                    if cpg.currency_id.id != currency.id and cpg.manual_currency_rate:
+                        amount = amount / cpg.manual_currency_rate
                     grand_total_debit += amount
 
                 grand_total_balance = grand_total_debit - grand_total_credit
@@ -397,7 +397,7 @@ class report_bi_vendor_transaction(models.AbstractModel):
                         'reference': inv.name,
                         'debit': debit,
                         'credit': credit,
-                        'currency_rate': inv.currency_rate,
+                        'currency_rate': inv.manual_currency_rate,
                         'amount_in_currency': debit if inv.type == "in_refund" else credit,
                     })
 
@@ -424,8 +424,8 @@ class report_bi_vendor_transaction(models.AbstractModel):
                     amount_in_currency = payment_amount
                     credit = 0.0
 
-                    if cpg.currency_id.id != currency.id and cpg.currency_rate:
-                        debit = debit / cpg.currency_rate
+                    if cpg.currency_id.id != currency.id and cpg.manual_currency_rate:
+                        debit = debit / cpg.manual_currency_rate
 
                     globle_dict_list.append({
                         'obj': cpg,
@@ -436,7 +436,7 @@ class report_bi_vendor_transaction(models.AbstractModel):
                         'reference': cpg.name,
                         'debit': debit,
                         'credit': credit,
-                        'currency_rate': cpg.currency_rate,
+                        'currency_rate': cpg.manual_currency_rate,
                         'amount_in_currency': amount_in_currency,
                         'payment_currency': cpg.currency_id,
                     })
@@ -565,8 +565,8 @@ class report_bi_vendor_transaction(models.AbstractModel):
                 debit = payment.unmatched_amount and payment.unmatched_amount or payment.amount
                 currency_amount = debit
                 credit = 0.0
-                if payment_group_line.currency_id.id != line_currency.id and payment_group_line.currency_rate:
-                    debit = debit / payment_group_line.currency_rate
+                if payment_group_line.currency_id.id != line_currency.id and payment_group_line.manual_currency_rate:
+                    debit = debit / payment_group_line.manual_currency_rate
                 balance = debit - credit
 
                 payment_total_debit += debit
@@ -586,7 +586,7 @@ class report_bi_vendor_transaction(models.AbstractModel):
                     'name': name,
                     'footnotes': {},
                     'columns': [payment.payment_date, payment.receiptbook_id.display_name, invoice_number, '',
-                                self._formatted(payment_group_line.currency_rate, 6),
+                                self._formatted(payment_group_line.manual_currency_rate, 6),
                                 self._format(currency_amount, payment_group_line.currency_id),
                                 self._format(debit, line_currency), self._format(credit, line_currency),
                                 self._format(balance, line_currency)],
@@ -598,8 +598,8 @@ class report_bi_vendor_transaction(models.AbstractModel):
             credit = 0.0
             debit = aml.with_context(payment_group_id=payment_group_line.id).payment_group_matched_amount
             currency_amount = aml.with_context(payment_group_id=payment_group_line.id).payment_group_matched_amount
-            if payment_group_line.currency_id.id != line_currency.id and payment_group_line.currency_rate:
-                debit = debit / payment_group_line.currency_rate
+            if payment_group_line.currency_id.id != line_currency.id and payment_group_line.manual_currency_rate:
+                debit = debit / payment_group_line.manual_currency_rate
             balance = debit - credit
 
             payment_total_debit += debit
@@ -618,7 +618,7 @@ class report_bi_vendor_transaction(models.AbstractModel):
                 'name': invoice_number,
                 'footnotes': {},
                 'columns': [aml.date, payment_group_line.receiptbook_id.display_name, invoice_number, '',
-                            self._formatted(payment_group_line.currency_rate, 6),
+                            self._formatted(payment_group_line.manual_currency_rate, 6),
                             self._format(currency_amount, payment_group_line.currency_id),
                             self._format(debit, line_currency), self._format(credit, line_currency),
                             self._format(balance, line_currency)],
@@ -689,7 +689,7 @@ class vendor_transection_context_report(models.TransientModel):
         return self.env['vendor.transaction.report']
 
     def get_columns_names(self):
-        return [_("Date"), _("Doc Type"), _("Number"), _("Reference"), _("Exchange Rate"), _("Amount in Currency"), _("Debit"), _("Credit"), _("Balance")]
+        return [_("Date"), _("Doc Type"), _("Number"), _("Reference"), _("Manual Rate"), _("Amount in Currency"), _("Debit"), _("Credit"), _("Balance")]
 
     @api.multi
     def get_columns_types(self):
