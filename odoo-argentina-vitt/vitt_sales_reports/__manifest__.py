@@ -19,13 +19,11 @@
 
     # any module necessary for this one to work correctly
     'depends': [
-        'account',
         'sale',
-        'account_withholding',
+        'account',
         'l10n_ar_account',
-        'account_withholding_automatic',
+        'account_withholding',
         'vitt_nl_setting',
-        'account_payment_group',
     ],
 
     # always loaded
