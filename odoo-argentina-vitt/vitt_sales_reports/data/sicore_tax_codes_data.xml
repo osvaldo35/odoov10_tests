@@ -15,7 +15,7 @@
 
         <record id="sicore_tax_code_03" model="sicore.codes">
             <field name="name">210</field>
-            <field name="comment">Ganancias Régimen Especial de Ingreso RG 830</field>
+            <field name="comment">Ganancias Regimen Especial de Ingreso RG 830</field>
         </record>
 
         <record id="sicore_tax_code_04" model="sicore.codes">
