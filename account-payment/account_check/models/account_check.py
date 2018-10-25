@@ -720,15 +720,15 @@ class AccountCheck(models.Model):
             #if operation == 'reclaimed':
             #    product = self.env['product.template'].search([('tc_state','=','tc_rec_endorsed')])
             if operation == 'rejected':
-                product = self.env['product.product'].search([('tc_state','=','tc_rejected')])
+                product = self.env['product.product'].search([('tc_state','=','tc_rejected')],limit=1)
             if operation == 'returned':
-                product = self.env['product.product'].search([('tc_state','=','tc_canceled')])
+                product = self.env['product.product'].search([('tc_state','=','tc_canceled')],limit=1)
             account2 = product.property_account_income_id.id
         else:
             if operation in ['rejected','reclaimed']:
-                product = self.env['product.product'].search([('oc_state','=','oc_rejected')])
+                product = self.env['product.product'].search([('oc_state','=','oc_rejected')],limit=1)
             if operation == 'returned':
-                product = self.env['product.product'].search([('oc_state','=','oc_canceled')])
+                product = self.env['product.product'].search([('oc_state','=','oc_canceled')],limit=1)
             account2 = product.property_account_expense_id.id
         if not product.id:
             raise ValidationError(_('No existe Producto asociado a este estado del cheque, por favor, cree uno nuevo'))
@@ -739,7 +739,7 @@ class AccountCheck(models.Model):
         inv_line_check_vals = {
             'name': name,
             'account_id': account2,
-            'invoice_line_tax_ids': [(6, 0, account_company.tax_ids.ids)],
+            'invoice_line_tax_ids': [(6, 0, product.taxes_id.ids)],
             'partner_id': partner.id,
             'price_unit': self.amount, #(self.amount_currency and self.amount_currency or self.amount),
             'product_id': product.id,

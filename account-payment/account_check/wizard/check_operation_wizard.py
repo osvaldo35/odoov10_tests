@@ -157,7 +157,7 @@ class account_check_wizard(models.TransientModel):
             #raise UserError(_('Can\'t discard last Debit Note!'))
 
         if check.type == 'issue_check':
-            operation = check._get_operation('rejected')
+            operation = check._get_operation('reclaimed')
             if operation.owner_model == 'account.invoice':
                 inv = self.env['account.invoice'].search([('id', '=', operation.owner_id)])
                 if inv.state not in ['paid']:
