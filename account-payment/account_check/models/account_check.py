@@ -719,7 +719,7 @@ class AccountCheck(models.Model):
         if partner_type == 'customer':
             #if operation == 'reclaimed':
             #    product = self.env['product.template'].search([('tc_state','=','tc_rec_endorsed')])
-            if operation == 'rejected':
+            if operation in ['rejected','reclaimed']:
                 product = self.env['product.product'].search([('tc_state','=','tc_rejected')],limit=1)
             if operation == 'returned':
                 product = self.env['product.product'].search([('tc_state','=','tc_canceled')],limit=1)
@@ -735,11 +735,15 @@ class AccountCheck(models.Model):
         if not account2:
             raise ValidationError(_('Por favor llene la cuenta de ingresos en el Item'))
 
+        if partner_type == 'supplier':
+            taxes = product.supplier_taxes_id.ids
+        else:
+            taxes = product.taxes_id.ids
         name = _('Check %s rejection CN') % (self.name)
         inv_line_check_vals = {
             'name': name,
             'account_id': account2,
-            'invoice_line_tax_ids': [(6, 0, product.taxes_id.ids)],
+            'invoice_line_tax_ids': [(6, 0, taxes)],
             'partner_id': partner.id,
             'price_unit': self.amount, #(self.amount_currency and self.amount_currency or self.amount),
             'product_id': product.id,
@@ -830,7 +834,11 @@ class AccountCheck(models.Model):
                 if line.debit > 0:
                     credit_account = line.account_id
 
-            debit_account = self.journal_id.default_credit_account_id #self.company_id._get_check_account('rejected')
+            if self.type == 'issue_check':
+                debit_account = self.journal_id.default_credit_account_id
+            else:
+                debit_account = self.company_id._get_check_account('rejected')
+
             name = _('Check "%s" rejected by bank') % (self.name)
             # credit_account_id = vou_journal.default_credit_account_id.id
         elif action == 'deliver_reject':

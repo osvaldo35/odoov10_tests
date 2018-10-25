@@ -157,7 +157,7 @@ class account_check_wizard(models.TransientModel):
             #raise UserError(_('Can\'t discard last Debit Note!'))
 
         if check.type == 'issue_check':
-            operation = check._get_operation('reclaimed')
+            operation = check._get_operation('rejected')
             if operation.owner_model == 'account.invoice':
                 inv = self.env['account.invoice'].search([('id', '=', operation.owner_id)])
                 if inv.state not in ['paid']:
@@ -166,7 +166,10 @@ class account_check_wizard(models.TransientModel):
         if exp_type == '3':
             if amount <= 0:
                 raise UserError(_('You can\'t claim with Zero Amount!'))
-        return check.action_create_debit_note(check.state, partner_type, check.partner_id, account, amount, account_company)
+        if check.type == 'issue_check':
+            return check.action_create_debit_note('rejected', partner_type, check.partner_id, account, amount, account_company)
+        else:
+            return check.action_create_debit_note('reclaimed', partner_type, check.partner_id, account, amount, account_company)
 
 
     @api.multi
