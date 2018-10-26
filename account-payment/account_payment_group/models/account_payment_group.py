@@ -869,7 +869,7 @@ class AccountInvoiceConfirm(models.TransientModel):
         active_ids = context.get('active_ids', []) or []
 
         for record in self.env['account.payment.group'].browse(active_ids):
-            if record.state not in ('draft'):
+            if record.state not in ('draft','confirmed'):
                 raise UserError(_("Selected invoice(s) cannot be confirmed as they are not in 'Draft' or 'Pro-Forma' state."))
             record.post()
         return {'type': 'ir.actions.act_window_close'}

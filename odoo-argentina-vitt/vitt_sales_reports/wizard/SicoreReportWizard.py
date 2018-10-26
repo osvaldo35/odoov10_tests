@@ -8,6 +8,7 @@ from decimal import *
 import time
 from . import VATReport_wizard
 import string
+import re
 
 class inventory_excel_extended(models.TransientModel):
     _name= "sicore.extended"
@@ -114,7 +115,7 @@ class sire_report(models.TransientModel):
                         tstr2 += "{:0>2}".format('??')
                     tmpstr = pay.partner_id.main_id_number
                     tstr2 += "{:0>20}".format(tmpstr.replace('-', '0'))
-                    tmpstr = pay.withholding_number
+                    tmpstr = re.sub("\D", "", pay.withholding_number)
                     if not pay.withholding_number:
                         tmpstr = '??????????????'
                     tstr2 += "{:0>14}".format(tmpstr.replace('-', '0'))
