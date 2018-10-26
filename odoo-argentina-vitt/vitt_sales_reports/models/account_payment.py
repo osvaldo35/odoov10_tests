@@ -11,6 +11,9 @@ class AccountInvoice(models.Model):
     def action_invoice_open(self):
         for rec in self:
             if rec.journal_id.use_documents:
+                if not (rec.partner_id.main_id_number and rec.partner_id.main_id_category_id and
+                        rec.partner_id.afip_responsability_type_id):
+                    raise UserError(_('Please, Complete Partner fields main id number, category and responsability type first'))
                 domain = [
                     ('type', 'in', ['in_invoice', 'in_refund']),
                     ('state', '!=', 'draft'),
