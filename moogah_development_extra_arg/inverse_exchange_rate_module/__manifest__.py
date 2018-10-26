@@ -3,7 +3,7 @@
 
 {
     "name": "Inverse Exchange Rate",
-    "version": "10.0.1.0.10",
+    "version": "10.0.1.0.11",
     "depends": ['base', 'account', 'account_accountant'],
     "author": "BrowseInfo",
     "description": """
@@ -22,7 +22,7 @@
         'views/purchase_order_view.xml',
 
     ],
-    'depends': ['account_payment_group', 'sale_stock', 'purchase'],
+    'depends': ['vitt_sales_reports', 'sale_stock', 'purchase'],
     'qweb': [],
     "auto_install": False,
     "installable": True,
