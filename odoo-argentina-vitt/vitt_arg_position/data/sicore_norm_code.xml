@@ -2,7 +2,7 @@
 <odoo>
     <data noupdate="True">    
         <record model="sicore.norm.codes" id="arciba_code_1">
-            <field name="comment">Art. 64, Anexo I de Res. 939/13 - COMPANIAS DE SEGUROS</field>
+            <field name="comment">Art. 64, Anexo I de Res. 939/13 - COMPAÑIAS DE SEGUROS</field>
             <field name="name">1</field>
             <field name="operation_type">withholding</field>
             <field name="tax_scope">supplier</field>
@@ -182,7 +182,7 @@
             <field name="tax_scope">sale</field>
         </record>
         <record model="sicore.norm.codes" id="arciba_code_31">
-            <field name="comment">PADRON DE REGIMENES GENERALES Art. 16 Resolucion N 421-AGIP/2016</field>
+            <field name="comment">PADRON DE REGIMENES GENERALES Art. 16 Resolución N 421-AGIP/2016</field>
             <field name="name">29</field>
             <field name="operation_type">perception</field>
             <field name="tax_scope">sale</field>
