@@ -2,6 +2,7 @@
 from odoo import _, api, fields, models
 from odoo.addons.payment.models.payment_acquirer import ValidationError
 from odoo.exceptions import UserError
+from odoo.tools import float_compare
 import logging
 import mercadopago
 from datetime import datetime
@@ -57,7 +58,7 @@ class PaymentMercadoPago(models.Model):
     mercadopago_ipn_url = fields.Char(string='IPN URL', groups='base.group_user', compute='_get_ipn_url')
     mercadopago_enable_MercadoEnvio = fields.Boolean(string='Enable MercadoEnvio', groups='base.group_user')
     auto_confirm = fields.Selection(selection_add=[('confirm_order_draft_acquirer', 'Authorize & capture the amount, confirm the SO, create	the	payment	and	save the invoice in	draft state on acquirer confirmation'),("confirm_order_confirm_inv","Authorize & capture the amount, confirm the SO and auto-validate the invoice on acquirer confirmation")],
-                                    default="confirm_order_draft_acquirer")
+                                    domain=[('provider', '=', 'mercadopago')],)
     available_payment_method = fields.Selection([('all', 'All Available Payment Methods Available'),
                                                  ('custom', 'Customized Available Payment Methods')],
                                                 default="all",
@@ -258,92 +259,112 @@ class PaymentTransactionMercadoPago(models.Model):
                 vals['reference'] = vals.get('reference', '')[:20]
         return super(PaymentTransactionMercadoPago, self).create(vals)
 
-    # def _generate_and_pay_invoice(self):
-    #     self.sale_order_id._force_lines_to_invoice_policy_order()
-    #     ctx_company = {'company_id': self.sale_order_id.company_id.id,
-    #                    'force_company': self.sale_order_id.company_id.id}
-    #     created_invoice = self.sale_order_id.with_context(**ctx_company).action_invoice_create()
-    #     created_invoice = self.env['account.invoice'].browse(created_invoice).with_context(**ctx_company)
-    #
-    #     if created_invoice:
-    #         # print("------auto_confirm-----",self.acquirer_id)
-    #         # print("------auto_confirm-----",self.acquirer_id.auto_confirm)
-    #         if self.acquirer_id.auto_confirm == "confirm_order_draft_acquirer":
-    #             # To keep invoice created for particular SO to draft state.
-    #             _logger.info('<%s> transaction completed, auto-generated invoice %s (ID %s) for %s (ID %s)',
-    #                          self.acquirer_id.provider, created_invoice.name, created_invoice.id,
-    #                          self.sale_order_id.name, self.sale_order_id.id)
-    #
-    #             # created_invoice.action_invoice_open()
-    #             self.sale_order_id.write({'invoice_status': 'invoiced'})
-    #             if not self.acquirer_id.journal_id:
-    #                 default_journal = self.env['account.journal'].search([('type', '=', 'bank')], limit=1)
-    #                 if not default_journal:
-    #                     _logger.warning(
-    #                         '<%s> transaction completed, could not auto-generate payment for %s (ID %s) (no journal set on acquirer)',
-    #                         self.acquirer_id.provider, self.sale_order_id.name, self.sale_order_id.id)
-    #                 self.acquirer_id.journal_id = default_journal
-    #                 created_invoice.with_context(tx_currency_id=self.currency_id.id).pay_and_reconcile(
-    #                     self.acquirer_id.journal_id, pay_amount=created_invoice.amount_total)
-    #                 if created_invoice.payment_ids:
-    #                     created_invoice.payment_ids[0].payment_transaction_id = self
-    #         #     Creating Payment record related to particular Invoice generated from MercadoPago paayment Gateway.
-    #             pay_journal = self.env['account.journal'].browse([self.acquirer_id.journal_id.id])
-    #             print("------pay_journal-----",pay_journal)
-    #
-    #             payment_type = created_invoice.type in ('out_invoice', 'in_refund') and 'inbound' or 'outbound'
-    #             if payment_type == 'inbound':
-    #                 payment_method = self.env.ref('account.account_payment_method_manual_in')
-    #                 journal_payment_methods = pay_journal.inbound_payment_method_ids
-    #             else:
-    #                 payment_method = self.env.ref('account.account_payment_method_manual_out')
-    #                 journal_payment_methods = pay_journal.outbound_payment_method_ids
-    #             if payment_method not in journal_payment_methods:
-    #                 raise UserError(_('No appropriate payment method enabled on journal %s') % pay_journal.name)
-    #
-    #             communication = created_invoice.type in ('in_invoice', 'in_refund') and created_invoice.reference or created_invoice.number or ""
-    #             if created_invoice.origin:
-    #                 communication = '%s (%s)' % (communication, created_invoice.origin)
-    #
-    #             payment_values = {'invoice_ids': [(6, 0, created_invoice.ids)],
-    #                               'amount': created_invoice.amount_total or created_invoice.residual,
-    #                               'payment_date': fields.Date.context_today(self),
-    #                               'communication': communication,
-    #                               'partner_id': created_invoice.partner_id.id,
-    #                               'partner_type': created_invoice.type in ('out_invoice', 'out_refund') and 'customer' or 'supplier',
-    #                               'journal_id': self.acquirer_id.journal_id.id,
-    #                               'payment_type': payment_type,
-    #                               'payment_method_id': payment_method.id,
-    #                               }
-    #             if self.env.context.get('tx_currency_id'):
-    #                 payment_values['currency_id'] = self.env.context.get('tx_currency_id')
-    #
-    #             payment = self.env['account.payment'].create(payment_values)
-    #             print("-----payment has been created with id of : ",payment)
-    #
-    #
-    #         else:
-    #             _logger.info('<%s> transaction completed, auto-generated invoice %s (ID %s) for %s (ID %s)',
-    #                          self.acquirer_id.provider, created_invoice.name, created_invoice.id,
-    #                          self.sale_order_id.name, self.sale_order_id.id)
-    #
-    #             created_invoice.action_invoice_open()
-    #             print("-----self.acquirer_id.journal_id------",self.acquirer_id.journal_id)
-    #             if not self.acquirer_id.journal_id:
-    #                 default_journal = self.env['account.journal'].search([('type', '=', 'bank')], limit=1)
-    #                 if not default_journal:
-    #                     _logger.warning(
-    #                         '<%s> transaction completed, could not auto-generate payment for %s (ID %s) (no journal set on acquirer)',
-    #                         self.acquirer_id.provider, self.sale_order_id.name, self.sale_order_id.id)
-    #                 self.acquirer_id.journal_id = default_journal
-    #             created_invoice.with_context(tx_currency_id=self.currency_id.id).pay_and_reconcile(
-    #                 self.acquirer_id.journal_id, pay_amount=created_invoice.amount_total)
-    #             self.sale_order_id.write({'invoice_status' : 'invoiced'})
-    #             if created_invoice.payment_ids:
-    #                 created_invoice.payment_ids[0].payment_transaction_id = self
-    #     else:
-    #         _logger.warning('<%s> transaction completed, could not auto-generate invoice for %s (ID %s)',
-    #                             self.acquirer_id.provider, self.sale_order_id.name, self.sale_order_id.id)
+    def _generate_and_pay_invoice(self, tx, acquirer_name):
+        tx.sale_order_id._force_lines_to_invoice_policy_order()
+
+        # force company to ensure journals/accounts etc. are correct
+        # company_id needed for default_get on account.journal
+        # force_company needed for company_dependent fields
+        ctx_company = {'company_id': tx.sale_order_id.company_id.id,
+                       'force_company': tx.sale_order_id.company_id.id}
+        created_invoice = tx.sale_order_id.with_context(**ctx_company).action_invoice_create()
+        created_invoice = self.env['account.invoice'].browse(created_invoice).with_context(**ctx_company)
+
+        if created_invoice:
+            _logger.info('<%s> transaction completed, auto-generated invoice %s (ID %s) for %s (ID %s)',
+                         acquirer_name, created_invoice.name, created_invoice.id, tx.sale_order_id.name, tx.sale_order_id.id)
+
+            created_invoice.action_invoice_open()
+            if tx.acquirer_id.journal_id:
+                created_invoice.with_context(tx_currency_id=tx.currency_id.id).pay_and_reconcile(tx.acquirer_id.journal_id, pay_amount=created_invoice.amount_total)
+                if created_invoice.payment_ids:
+                    created_invoice.payment_ids[0].payment_transaction_id = tx
+            else:
+                _logger.warning('<%s> transaction completed, could not auto-generate payment for %s (ID %s) (no journal set on acquirer)',
+                                acquirer_name, tx.sale_order_id.name, tx.sale_order_id.id)
+        else:
+            _logger.warning('<%s> transaction completed, could not auto-generate invoice for %s (ID %s)',
+                            acquirer_name, tx.sale_order_id.name, tx.sale_order_id.id)
+
+
+    def _confirm_so(self, acquirer_name=False):
+        for tx in self:
+            if tx.acquirer_id.provider == "mercadopago":
+                # print "inside _confirm_so method with record : ", tx
+                # check tx state, confirm the potential SO
+                if tx.sale_order_id and tx.sale_order_id.state in ['draft', 'sent']:
+                    # verify SO/TX match, excluding tx.fees which are currently not included in SO
+                    amount_matches = float_compare(tx.amount, tx.sale_order_id.amount_total, 2) == 0
+                    if amount_matches:
+                        # print "condition is true and going to confirm so"
+                        # print "acquirer ref is : ", acquirer_name
+                        if not acquirer_name:
+                            acquirer_name = tx.acquirer_id.provider or 'unknown'
+                        # print "tx.acquirer_id.auto_confirm : ", tx.acquirer_id.provider,tx.acquirer_id.auto_confirm
+                        if tx.state == 'authorized' and tx.acquirer_id.auto_confirm == 'authorize':
+                            _logger.info('<%s> transaction authorized, auto-confirming order %s (ID %s)', acquirer_name,
+                                         tx.sale_order_id.name, tx.sale_order_id.id)
+                            tx.sale_order_id.with_context(send_email=True).action_confirm()
+                        if tx.state == 'done' and tx.acquirer_id.auto_confirm in ['confirm_so',
+                                                                                  'generate_and_pay_invoice',
+                                                                                  'confirm_order_draft_acquirer',
+                                                                                  'confirm_order_confirm_inv']:
+                            _logger.info('<%s> transaction completed, auto-confirming order %s (ID %s)', acquirer_name,
+                                         tx.sale_order_id.name, tx.sale_order_id.id)
+                            tx.sale_order_id.with_context(send_email=True).action_confirm()
+                            print "tx.sale_order_id : ",tx.sale_order_id.state
+                            if tx.acquirer_id.auto_confirm in ['generate_and_pay_invoice','confirm_order_confirm_inv'] :
+                                self._generate_and_pay_invoice(tx, acquirer_name)
+                        elif tx.state not in ['cancel', 'error'] and tx.sale_order_id.state == 'draft':
+                            _logger.info(
+                                '<%s> transaction pending/to confirm manually, sending quote email for order %s (ID %s)',
+                                acquirer_name, tx.sale_order_id.name, tx.sale_order_id.id)
+                            tx.sale_order_id.force_quotation_send()
+                    else:
+                        _logger.warning('<%s> transaction AMOUNT MISMATCH for order %s (ID %s): expected %r, got %r',
+                            acquirer_name, tx.sale_order_id.name, tx.sale_order_id.id, tx.sale_order_id.amount_total,
+                            tx.amount, )
+                        tx.sale_order_id.message_post(subject=_("Amount Mismatch (%s)") % acquirer_name, body=_(
+                            "The sale order was not confirmed despite response from the acquirer (%s): SO amount is %r but acquirer replied with %r.") % (
+                                                                                                                  acquirer_name,
+                                                                                                                  tx.sale_order_id.amount_total,
+                                                                                                                  tx.amount,))
+
+            else:
+                # check tx state, confirm the potential SO
+                if tx.sale_order_id and tx.sale_order_id.state in ['draft', 'sent']:
+                    # verify SO/TX match, excluding tx.fees which are currently not included in SO
+                    amount_matches = float_compare(tx.amount, tx.sale_order_id.amount_total, 2) == 0
+                    if amount_matches:
+                        if not acquirer_name:
+                            acquirer_name = tx.acquirer_id.provider or 'unknown'
+                        if tx.state == 'authorized' and tx.acquirer_id.auto_confirm == 'authorize':
+                            _logger.info('<%s> transaction authorized, auto-confirming order %s (ID %s)', acquirer_name, tx.sale_order_id.name, tx.sale_order_id.id)
+                            tx.sale_order_id.with_context(send_email=True).action_confirm()
+                        if tx.state == 'done' and tx.acquirer_id.auto_confirm in ['confirm_so', 'generate_and_pay_invoice']:
+                            _logger.info('<%s> transaction completed, auto-confirming order %s (ID %s)', acquirer_name, tx.sale_order_id.name, tx.sale_order_id.id)
+                            tx.sale_order_id.with_context(send_email=True).action_confirm()
+
+                            if tx.acquirer_id.auto_confirm == 'generate_and_pay_invoice':
+                                self._generate_and_pay_invoice(tx, acquirer_name)
+                        elif tx.state not in ['cancel', 'error'] and tx.sale_order_id.state == 'draft':
+                            _logger.info('<%s> transaction pending/to confirm manually, sending quote email for order %s (ID %s)', acquirer_name, tx.sale_order_id.name, tx.sale_order_id.id)
+                            tx.sale_order_id.force_quotation_send()
+                    else:
+                        _logger.warning(
+                            '<%s> transaction AMOUNT MISMATCH for order %s (ID %s): expected %r, got %r',
+                            acquirer_name, tx.sale_order_id.name, tx.sale_order_id.id,
+                            tx.sale_order_id.amount_total, tx.amount,
+                        )
+                        tx.sale_order_id.message_post(
+                            subject=_("Amount Mismatch (%s)") % acquirer_name,
+                            body=_("The sale order was not confirmed despite response from the acquirer (%s): SO amount is %r but acquirer replied with %r.") % (
+                                acquirer_name,
+                                tx.sale_order_id.amount_total,
+                                tx.amount,
+                            )
+                        )
+
 
     @api.multi
     def mercadopago_s2s_do_transaction(self, **data):
