@@ -14,19 +14,16 @@ class AccountConfigSettings(models.TransientModel):
     main_id_category_ids = fields.Many2many(related='company_id.main_id_category_ids')
 
 
-class ResPartner(models.Model):
-    _inherit = 'res.partner'
 
-    @api.multi
-    def write(self,vals):
-        for rec in self:
-            if rec.customer:
-                control_ids = rec.company_id.main_id_category_ids.ids
-                number = rec.main_id_number
-                if not number and 'main_id_number' in vals.keys():
-                    number = vals['main_id_number']
-                if rec.main_id_category_id.id in control_ids and number:
-                    if self.env['res.partner.id_number'].search([('name', '=', number),('category_id', '=', rec.main_id_category_id.id)]):
-                        raise ValidationError(_("NO puede haber 2 contactos con el mismo %s") % (rec.main_id_category_id.name))
+class ResPartnerId_number(models.Model):
+    _inherit = 'res.partner.id_number'
 
-        return super(ResPartner, self).write(vals)
+    @api.model
+    def create(self, vals):
+        control_ids = self.env.user.company_id.main_id_category_ids.ids
+        if 'category_id' in control_ids:
+            if 'name' in vals.keys() and 'category_id' in vals.keys():
+                if self.env['res.partner.id_number'].search([('name', '=', vals['name']), ('category_id', '=', vals['category_id'])]).ids:
+                    raise ValidationError(_("NO puede haber 2 contactos con el mismo %s") % (vals['name']))
+        return super(ResPartnerId_number, self).create(vals)
+
