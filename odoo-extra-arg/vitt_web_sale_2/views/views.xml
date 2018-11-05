@@ -17,6 +17,19 @@
         ]"/>
     </function>
 
+    <record id="res_partner_view_inherited2" model="ir.ui.view">
+        <field name="name">res.partner.view.inherited</field>
+        <field name="model">res.partner</field>
+        <field name="inherit_id" ref="base.view_partner_form" />
+        <field name="arch" type="xml">
+            <field name="email" position="after">
+                <field name="main_id_category_id"/>
+                <field name="main_id_number"/>
+                <field name="afip_responsability_type_id"/>
+            </field>
+        </field>
+    </record>
+
     <template id="vitt_website_sale2" inherit_id="website_sale.address">
         <xpath expr="//form[@name='/shop/checkout']/div[1]" position="replace">
 
@@ -38,14 +51,5 @@
 
         </xpath>
     </template>
-
-    <function model="ir.model.fields" name="formbuilder_whitelist">
-        <value>res.partner</value>
-        <value eval="[
-            'main_id_category_id',
-            'main_id_number',
-            'afip_responsability_type_id',
-        ]"/>
-    </function>
 
 </odoo>
