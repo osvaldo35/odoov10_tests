@@ -6,7 +6,7 @@
     'author': "Moogah",
     'website': "http://www.Moogah.com",
     'category': 'Uncategorized',
-    'version': '10.0.1.0.4',
+    'version': '10.0.1.0.5',
     'depends': [
         'website_sale',
         'website_form',
