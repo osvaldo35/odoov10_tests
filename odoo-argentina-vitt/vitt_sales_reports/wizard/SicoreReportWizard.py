@@ -13,8 +13,9 @@ import unicodedata
 
 def remove_accents(input_str):
     nfkd_form = unicodedata.normalize('NFKD', input_str)
-    return u"".join([c for c in nfkd_form if not unicodedata.combining(c)])[:30]
-
+    printable = set(string.printable)
+    res =  u"".join([c for c in nfkd_form if not unicodedata.combining(c)])[:30]
+    return filter(lambda x: x in printable, res)
 
 class inventory_excel_extended(models.TransientModel):
     _name= "sicore.extended"
@@ -87,7 +88,7 @@ class sire_report(models.TransientModel):
                     tmpstr = remove_accents(street[0:20])
 
                     tstr += "{:<20}".format(tmpstr)
-                    tmp = str(pay.partner_id.city)
+                    tmp = pay.partner_id.city
 
                     tmpstr = remove_accents(tmp[0:20])
 
