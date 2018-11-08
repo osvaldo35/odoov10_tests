@@ -3,7 +3,7 @@
     'name': 'Seteo para control de partner con mismo cuit duplicados',
     'summary': 'Seteo para control de partner con mismo cuit duplicados',
     'description': """Seteo para control de partner con mismo cuit duplicados""",
-    'version': '10.0.1.0.1',
+    'version': '10.0.1.0.2',
     'author': 'Moogah',
     'website': 'http://www.moogah.com',
     'depends': [

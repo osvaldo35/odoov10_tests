@@ -21,8 +21,8 @@ class ResPartnerId_number(models.Model):
     @api.model
     def create(self, vals):
         control_ids = self.env.user.company_id.main_id_category_ids.ids
-        if 'category_id' in control_ids:
-            if 'name' in vals.keys() and 'category_id' in vals.keys():
+        if 'name' in vals.keys() and 'category_id' in vals.keys():
+            if vals['category_id'] in control_ids:
                 if self.env['res.partner.id_number'].search([('name', '=', vals['name']), ('category_id', '=', vals['category_id'])]).ids:
                     raise ValidationError(_("NO puede haber 2 contactos con el mismo %s") % (vals['name']))
         return super(ResPartnerId_number, self).create(vals)

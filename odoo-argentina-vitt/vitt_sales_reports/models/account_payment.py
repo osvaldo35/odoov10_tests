@@ -16,7 +16,7 @@ class AccountInvoice(models.Model):
                     raise UserError(_('Please, Complete Partner fields main id number, category and responsability type first'))
                 domain = [
                     ('type', 'in', ['in_invoice', 'in_refund']),
-                    ('state', '!=', 'draft'),
+                    ('state', 'not in', ['draft','cancel']),
                     ('partner_id', '=', rec.partner_id.id),
                     ('document_number', '=', rec.document_number),
                     ('journal_document_type_id','=',rec.journal_document_type_id.id),

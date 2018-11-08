@@ -15,7 +15,7 @@ TWOPLACES = Decimal(10) ** -2
 
 def remove_accents(input_str):
     nfkd_form = unicodedata.normalize('NFKD', input_str)
-    return u"".join([c for c in nfkd_form if not unicodedata.combining(c)])
+    return u"".join([c for c in nfkd_form if not unicodedata.combining(c)])[:30]
 
 def parse(str):
     printable = set(string.printable)
@@ -228,6 +228,8 @@ class citi_reports(models.TransientModel):
                     res.append("falta codigo afip para moneda " + inv.display_name)
                 if inv.currency_id != inv.company_currency_id and not inv.currency_rate:
                     res.append("falta tipo de cambio " + inv.display_name)
+                if not inv.partner_id.name:
+                    res.append("falta nombre de partner " + inv.display_name)
         return res
 
 
@@ -275,7 +277,7 @@ class citi_reports(models.TransientModel):
                 tstr = tstr + "{:0>2}".format(inv.partner_id.main_id_category_id.afip_code)
                 tstr = tstr + "{:0>20}".format(inv.partner_id.main_id_number)
 
-                tmpstr = remove_accents(parse(inv.partner_id.name))
+                tmpstr = remove_accents(inv.partner_id.name)
 
                 tstr = tstr + "{:<30}".format(tmpstr)
 
@@ -474,7 +476,9 @@ class citi_reports(models.TransientModel):
                 tstr_v_cbte += "{:0>2}".format(inv.partner_id.main_id_category_id.afip_code)
                 tstr_v_cbte += "{:0>20}".format(inv.partner_id.main_id_number)
 
-                tmpstr = remove_accents(parse(inv.partner_id.name))
+
+
+                tmpstr = remove_accents(inv.partner_id.name)
 
                 tstr_v_cbte += "{:<30}".format(tmpstr)
 
