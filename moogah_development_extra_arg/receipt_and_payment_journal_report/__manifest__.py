@@ -2,7 +2,7 @@
 
 {
     'name': 'Receipt and Payment Journal Report',
-    'version': '10.0.1.0',
+    'version': '10.0.1.1',
     'category': 'Accounting',
     'summary': '',
     'description': """
@@ -13,12 +13,12 @@
     'website': 'www.moogah.com',
     'images': [],
     'depends': ['account_payment_group',
-                'detailed_general_ledger_report',
+                'bi_partner_transaction_report',
                 'vitt_analytic_tags_account'],
     'data': [
         'views/report_financial.xml',
-        'views/payment_journal_report_view.xml',
-        'wizard/payment_journal_report_wizard_views.xml',
+        'views/receipt_payment_journal_report_view.xml',
+        'wizard/receipt_payment_journal_report_wizard_views.xml',
 
     ],
     'installable': True,

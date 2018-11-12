@@ -9,9 +9,9 @@ import StringIO
 from odoo.tools import config
 
 
-class PaymentJournalReport(models.AbstractModel):
-    _name = "payment.journal.report"
-    _description = "Payment Journal Report"
+class ReceiptJournalReport(models.AbstractModel):
+    _name = "receipt.journal.report"
+    _description = "Receipt Journal Report"
 
     def _format(self, value, currency=False):
         if self.env.context.get('no_format') and not self.env.context.get('xlsx_format'):
@@ -25,23 +25,22 @@ class PaymentJournalReport(models.AbstractModel):
     @api.model
     def get_lines(self, context_id, line_id=None):
         if type(context_id) == int:
-            context_id = self.env['payment.journal.context.report'].search([['id', '=', context_id]])
+            context_id = self.env['receipt.journal.context.report'].search([['id', '=', context_id]])
         new_context = dict(self.env.context)
         new_context.update({
             'date_from': context_id.date_from,
             'date_to': context_id.date_to,
             'context_id': context_id,
-            'payment_no': context_id.payment_no,
+            'receipt_no': context_id.receipt_no,
             'journal_ids': context_id.journal_ids.ids,
             'partner_id': context_id.partner_id.id,
-            'analytic_tag_id': context_id.analytic_tag_id.id,
             'reference': context_id.reference,
             'confirmed': context_id.confirmed,
             'posted': context_id.posted,
             'detail_level': context_id.detail_level,
         })
         if new_context.get('xlsx_format'):
-            if new_context.get('detail_level') == 'per_supplier':
+            if new_context.get('detail_level') == 'per_customer':
                 res = self.with_context(new_context)._xlsx_lines(line_id)
             else:
                 res = self.with_context(new_context)._overview_xlsx_lines(line_id)
@@ -62,11 +61,11 @@ class PaymentJournalReport(models.AbstractModel):
         apg_obj = self.env['account.payment.group']
         partner_obj = self.env['res.partner']
         used_currency = self.env.user.company_id.currency_id
-        suppliers = partner_obj.search([('supplier', '=', True)])
+        customers = partner_obj.search([('customer', '=', True)])
         if context.get('partner_id'):
-            suppliers = partner_obj.browse(context.get('partner_id'))
-        for supplier in suppliers:
-            domain = self._get_domain(context, supplier.id)
+            customers = partner_obj.browse(context.get('partner_id'))
+        for customer in customers:
+            domain = self._get_domain(context, customer.id)
             sorted_apg = apg_obj.search(domain)
             for payment_group in sorted_apg:
                 first_line = False
@@ -90,7 +89,7 @@ class PaymentJournalReport(models.AbstractModel):
                         payment_date = not first_line and datetime.strptime(payment_group.payment_date,
                                                                             DEFAULT_SERVER_DATE_FORMAT).strftime(
                             date_format) or None
-                        supplier_name = not first_line and supplier.name or ''
+                        customer_name = not first_line and customer.name or ''
                         lines.append({
                             'id': move_line.id,
                             'type': 'line_id',
@@ -101,7 +100,7 @@ class PaymentJournalReport(models.AbstractModel):
                             'name': 'Line',
                             'colspan': 0,
                             'footnotes': {},
-                            'columns': [supplier_name, number, payment_date,
+                            'columns': [customer_name, number, payment_date,
                                         move_line.invoice_id.display_name,
                                         not first_line and
                                         self._format(payment_amount, payment_currency) or '',
@@ -110,26 +109,26 @@ class PaymentJournalReport(models.AbstractModel):
                             'level': 1,
                         })
                         first_line = True
-                        if not move_lines:
-                            payment_date = datetime.strptime(payment_group.payment_date,
-                                                             DEFAULT_SERVER_DATE_FORMAT).strftime(
-                                date_format)
-                            lines.append({
-                                'id': payment_group.id,
-                                'type': 'line_id',
-                                'journal_id': not first_line and journals[0].id or False,
-                                'total_journal': not first_line and currency_amount or 0.0,
-                                'total_journal_in_currency': not first_line and payment_amount or 0.0,
-                                'move_id': False,
-                                'name': 'Line',
-                                'colspan': 0,
-                                'footnotes': {},
-                                'columns': [supplier.name, payment_group.display_name, payment_date,
-                                            '', self._format(payment_amount, payment_currency),
-                                            self._format(total_amount, used_currency)],
-                                'level': 1,
-                            })
-                            first_line = True
+                    if not move_lines:
+                        payment_date = datetime.strptime(payment_group.payment_date,
+                                                         DEFAULT_SERVER_DATE_FORMAT).strftime(
+                            date_format)
+                        lines.append({
+                            'id': payment_group.id,
+                            'type': 'line_id',
+                            'journal_id': not first_line and journals[0].id or False,
+                            'total_journal': not first_line and currency_amount or 0.0,
+                            'total_journal_in_currency': not first_line and payment_amount or 0.0,
+                            'move_id': False,
+                            'name': 'Line',
+                            'colspan': 0,
+                            'footnotes': {},
+                            'columns': [customer.name, payment_group.display_name, payment_date,
+                                        '', self._format(payment_amount, payment_currency),
+                                        self._format(total_amount, used_currency)],
+                            'level': 1,
+                        })
+                        first_line = True
 
                 else:
                     journal_array = []
@@ -149,7 +148,7 @@ class PaymentJournalReport(models.AbstractModel):
                         payment_date = not first_line and datetime.strptime(payment_group.payment_date,
                                                                             DEFAULT_SERVER_DATE_FORMAT).strftime(
                             date_format) or None
-                        supplier_name = not first_line and supplier.name or ''
+                        customer_name = not first_line and customer.name or ''
                         if not last_journal:
                             payment_amount_journal = journal_array[i]['amount'] if journal_array else 0.0
                             currency_amount_journal = payment_currency.compute(
@@ -177,7 +176,7 @@ class PaymentJournalReport(models.AbstractModel):
                             'name': 'Line',
                             'colspan': 0,
                             'footnotes': {},
-                            'columns': [supplier_name, number, payment_date,
+                            'columns': [customer_name, number, payment_date,
                                         move_line.invoice_id.display_name,
                                         not last_journal and journal_payment_amount_line or '',
                                         not last_journal and self._format(total_amount, used_currency) or ''],
@@ -195,7 +194,7 @@ class PaymentJournalReport(models.AbstractModel):
                         payment_date = not first_line and datetime.strptime(payment_group.payment_date,
                                                                             DEFAULT_SERVER_DATE_FORMAT).strftime(
                             date_format) or None
-                        supplier_name = not first_line and supplier.name or ''
+                        customer_name = not first_line and customer.name or ''
                         payment_amount_journal = journal['amount']
                         currency_amount_journal = payment_currency.compute(payment_amount_journal, used_currency)
                         lines.append({
@@ -208,7 +207,7 @@ class PaymentJournalReport(models.AbstractModel):
                             'colspan': 0,
                             'name': 'Line',
                             'footnotes': {},
-                            'columns': [supplier_name, number, payment_date, '', journal['code'] + ' ' +
+                            'columns': [customer_name, number, payment_date, '', journal['code'] + ' ' +
                                         self._format(payment_amount_journal, payment_group.currency_id),
                                         not first_line and self._format(total_amount, used_currency) or ''],
                             'level': 1,
@@ -231,12 +230,12 @@ class PaymentJournalReport(models.AbstractModel):
                 payment_quantity = first_line and payment_quantity + 1 or payment_quantity
         if total_payment_journal_amount:
             lines.append({
-                'id': supplier.id,
+                'id': customer.id,
                 'type': 'line_id',
-                'name': _('Total Payment'),
+                'name': _('Total Receipt'),
                 'colspan': 0,
                 'footnotes': {},
-                'columns': [_('Total Payment'), '', None, '', '',
+                'columns': [_('Total Receipt'), '', None, '', '',
                             self._format(total_payment_journal_amount, used_currency)],
                 'level': 1,
             })
@@ -253,10 +252,10 @@ class PaymentJournalReport(models.AbstractModel):
             lines.append({
                 'id': 0,
                 'type': 'line_id',
-                'name': _('Total Payment Quantity'),
+                'name': _('Total Receipt Quantity'),
                 'colspan': 0,
                 'footnotes': {},
-                'columns': [_('Total Payment Quantity'), '', None, '', '', str(payment_quantity)],
+                'columns': [_('Total Receipt Quantity'), '', None, '', '', str(payment_quantity)],
                 'level': 1,
             })
         return lines
@@ -294,7 +293,7 @@ class PaymentJournalReport(models.AbstractModel):
                 currency_amount = payment_currency.compute(payment_amount, used_currency)
                 total_amount += currency_amount
                 for move_line in move_lines:
-                    supplier_name = not first_line and payment_group.partner_id.name or ''
+                    customer_name = not first_line and payment_group.partner_id.name or ''
                     number = not first_line and payment_group.display_name or ''
                     payment_date = not first_line and datetime.strptime(payment_group.payment_date,
                                                                         DEFAULT_SERVER_DATE_FORMAT).strftime(
@@ -309,18 +308,16 @@ class PaymentJournalReport(models.AbstractModel):
                         'colspan': 0,
                         'name': not first_line and _('Payment Journal') or '',
                         'footnotes': self.env.context['context_id']._get_footnotes('move_line_id', move_line.id),
-                        'columns': [number, payment_date, supplier_name,
+                        'columns': [number, payment_date, customer_name,
                                     move_line.invoice_id.display_name,
                                     not first_line and
                                     self._format(payment_amount, payment_currency) or ''],
                         'level': 1,
                     })
                     first_line = True
-
                 if not move_lines:
                     payment_date = datetime.strptime(payment_group.payment_date,
-                                                     DEFAULT_SERVER_DATE_FORMAT).strftime(
-                        date_format)
+                                                     DEFAULT_SERVER_DATE_FORMAT).strftime(date_format)
                     lines.append({
                         'id': payment_group.id,
                         'type': 'line_id',
@@ -328,15 +325,14 @@ class PaymentJournalReport(models.AbstractModel):
                         'total_journal': currency_amount,
                         'total_journal_in_currency': payment_amount,
                         'move_id': False,
-                        'name': '',
                         'colspan': 0,
+                        'name': '',
                         'footnotes': {},
                         'columns': [payment_group.display_name, payment_date, payment_group.partner_id.name,
                                     '', self._format(payment_amount, payment_currency)],
                         'level': 1,
                     })
                     first_line = True
-
                 if first_line:
                     lines.append({
                         'id': payment_group.id,
@@ -362,7 +358,7 @@ class PaymentJournalReport(models.AbstractModel):
                 payment_amount_journal = journal_array[0]['amount'] if journal_array else 0.0
                 i = 0
                 for move_line in move_lines:
-                    supplier_name = not first_line and payment_group.partner_id.name or ''
+                    customer_name = not first_line and payment_group.partner_id.name or ''
                     number = not first_line and payment_group.display_name or ''
                     payment_date = not first_line and datetime.strptime(payment_group.payment_date,
                                                                         DEFAULT_SERVER_DATE_FORMAT).strftime(
@@ -395,7 +391,7 @@ class PaymentJournalReport(models.AbstractModel):
                         'colspan': 0,
                         'name': not first_line and _('Payment Journal') or '',
                         'footnotes': self.env.context['context_id']._get_footnotes('move_line_id', move_line.id),
-                        'columns': [number, payment_date, supplier_name, move_line.invoice_id.display_name,
+                        'columns': [number, payment_date, customer_name, move_line.invoice_id.display_name,
                                     not last_journal and journal_payment_amount_line or ''],
                         'level': 1,
                         'no_payment_line': no_payment,
@@ -407,7 +403,7 @@ class PaymentJournalReport(models.AbstractModel):
                         last_journal = True
                     i += 1
                 for journal in filter(lambda x: not x.get('show'), journal_array):
-                    supplier_name = not first_line and payment_group.partner_id.name or ''
+                    customer_name = not first_line and payment_group.partner_id.name or ''
                     number = not first_line and payment_group.display_name or ''
                     payment_date = not first_line and datetime.strptime(payment_group.payment_date,
                                                                         DEFAULT_SERVER_DATE_FORMAT).strftime(
@@ -425,7 +421,7 @@ class PaymentJournalReport(models.AbstractModel):
                         'colspan': 0,
                         'name': '',
                         'footnotes': {},
-                        'columns': [number, payment_date, supplier_name, '',
+                        'columns': [number, payment_date, customer_name, '',
                                     journal['code'] + ' ' + self._format(
                                         payment_amount_journal, payment_currency)],
                         'level': 1,
@@ -462,10 +458,10 @@ class PaymentJournalReport(models.AbstractModel):
             lines.append({
                 'id': 0,
                 'type': 'line_id',
-                'name': _('Total Payment'),
+                'name': _('Total Receipt'),
                 'colspan': 0,
                 'footnotes': {},
-                'columns': [_('Total Payment'), None, '', '',
+                'columns': [_('Total Receipt'), None, '', '',
                             self._format(total_payment_amount, used_currency)],
                 'level': 1,
             })
@@ -482,10 +478,10 @@ class PaymentJournalReport(models.AbstractModel):
             lines.append({
                 'id': 0,
                 'type': 'line_id',
-                'name': _('Total Payment Quantity'),
+                'name': _('Total Receipt Quantity'),
                 'colspan': 0,
                 'footnotes': {},
-                'columns': [_('Total Payment Quantity'), None, '', '', str(payment_quantity)],
+                'columns': [_('Total Receipt Quantity'), None, '', '', str(payment_quantity)],
                 'level': 1,
             })
 
@@ -505,21 +501,21 @@ class PaymentJournalReport(models.AbstractModel):
         first_line = False
         apg_obj = self.env['account.payment.group']
         partner_obj = self.env['res.partner']
-        if context.get('detail_level') == 'per_supplier':
-            suppliers = partner_obj.search([('supplier', '=', True)])
+        if context.get('detail_level') == 'per_customer':
+            customers = partner_obj.search([('customer', '=', True)])
             if context.get('partner_id'):
-                suppliers = partner_obj.browse(context.get('partner_id'))
-            for supplier in suppliers:
-                total_supplier_amount = 0.0
-                domain = self._get_domain(context, supplier.id)
+                customers = partner_obj.browse(context.get('partner_id'))
+            for customer in customers:
+                total_customer_amount = 0.0
+                domain = self._get_domain(context, customer.id)
                 sorted_apg = apg_obj.search(domain)
                 partner_lines = [{
-                    'id': supplier.id,
-                    'partner_id': supplier.id,
+                    'id': customer.id,
+                    'partner_id': customer.id,
                     'type': 'line',
-                    'name': supplier.name,
+                    'name': customer.name,
                     'footnotes': {},
-                    'columns': [supplier.name, '', '', '', ''],
+                    'columns': [customer.name, '', '', '', ''],
                     'level': 1,
                     'unfoldable': False,
                     'unfolded': False,
@@ -542,7 +538,7 @@ class PaymentJournalReport(models.AbstractModel):
                         currency_amount = payment_currency.compute(payment_amount, used_currency)
                         total_amount += currency_amount
                         for move_line in move_lines:
-                            if not filter(lambda x: x.get('partner_id') and x.get('partner_id') == supplier.id, lines):
+                            if not filter(lambda x: x.get('partner_id') and x.get('partner_id') == customer.id, lines):
                                 lines.extend(partner_lines)
                             number = not first_line and payment_group.display_name or ''
                             payment_date = not first_line and datetime.strptime(payment_group.payment_date,
@@ -608,7 +604,7 @@ class PaymentJournalReport(models.AbstractModel):
                         payment_amount_journal = journal_array[0]['amount'] if journals else 0.0
                         i = 0
                         for move_line in move_lines:
-                            if not filter(lambda x: x.get('partner_id') and x.get('partner_id') == supplier.id, lines):
+                            if not filter(lambda x: x.get('partner_id') and x.get('partner_id') == customer.id, lines):
                                 lines.extend(partner_lines)
                             number = not first_line and payment_group.display_name or ''
                             payment_date = not first_line and datetime.strptime(payment_group.payment_date,
@@ -655,7 +651,7 @@ class PaymentJournalReport(models.AbstractModel):
                                 last_journal = True
                             i += 1
                         for journal in filter(lambda x: not x.get('show'), journal_array):
-                            if not filter(lambda x: x.get('partner_id') and x.get('partner_id') == supplier.id, lines):
+                            if not filter(lambda x: x.get('partner_id') and x.get('partner_id') == customer.id, lines):
                                 lines.extend(partner_lines)
                             number = not first_line and payment_group.display_name or ''
                             payment_date = not first_line and datetime.strptime(payment_group.payment_date,
@@ -693,17 +689,18 @@ class PaymentJournalReport(models.AbstractModel):
                                                                "", "border-top:1px solid;")],
                                 'level': 1,
                             })
-                    total_supplier_amount += total_amount
+                    total_customer_amount += total_amount
                     payment_quantity = first_line and payment_quantity + 1 or payment_quantity
-                total_payment_amount += total_supplier_amount
+                total_payment_amount += total_customer_amount
                 if first_line and sorted_apg:
                     lines.append({
-                        'id': supplier.id,
+                        'id': customer.id,
                         'type': 'o_account_reports_domain_total',
-                        'name': _('Total per Supplier’s Payments'),
+                        'name': _('Total per Customer’s Payments'),
                         'footnotes': {},
-                        'columns': [_('Total per Supplier’s Payments'), '', None, '',
-                                    (self._format(total_supplier_amount, used_currency),
+                        'style': "border-style: none;",
+                        'columns': [_('Total per Customer’s Payments'), '', None, '',
+                                    (self._format(total_customer_amount, used_currency),
                                      "", "border-top:1px solid;")],
                         'level': 1,
                     })
@@ -737,7 +734,7 @@ class PaymentJournalReport(models.AbstractModel):
                     currency_amount = payment_currency.compute(payment_amount, used_currency)
                     total_amount += currency_amount
                     for move_line in move_lines:
-                        supplier_name = not first_line and payment_group.partner_id.name or ''
+                        customer_name = not first_line and payment_group.partner_id.name or ''
                         number = not first_line and payment_group.display_name or ''
                         payment_date = not first_line and datetime.strptime(payment_group.payment_date,
                                                                             DEFAULT_SERVER_DATE_FORMAT).strftime(
@@ -752,7 +749,7 @@ class PaymentJournalReport(models.AbstractModel):
                             'colspan': 0,
                             'name': not first_line and _('Payment Journal') or '',
                             'footnotes': self.env.context['context_id']._get_footnotes('move_line_id', move_line.id),
-                            'columns': [number, payment_date, supplier_name,
+                            'columns': [number, payment_date, customer_name,
                                         move_line.invoice_id.display_name,
                                         not first_line and
                                         self._format(payment_amount, payment_currency) or ''],
@@ -804,7 +801,7 @@ class PaymentJournalReport(models.AbstractModel):
                     payment_amount_journal = journal_array[0]['amount'] if journals else 0.0
                     i = 0
                     for move_line in move_lines:
-                        supplier_name = not first_line and payment_group.partner_id.name or ''
+                        customer_name = not first_line and payment_group.partner_id.name or ''
                         number = not first_line and payment_group.display_name or ''
                         payment_date = not first_line and datetime.strptime(payment_group.payment_date,
                                                                             DEFAULT_SERVER_DATE_FORMAT).strftime(
@@ -837,7 +834,7 @@ class PaymentJournalReport(models.AbstractModel):
                             'colspan': 0,
                             'name': not first_line and _('Payment Journal') or '',
                             'footnotes': self.env.context['context_id']._get_footnotes('move_line_id', move_line.id),
-                            'columns': [number, payment_date, supplier_name, move_line.invoice_id.display_name,
+                            'columns': [number, payment_date, customer_name, move_line.invoice_id.display_name,
                                         not last_journal and journal_payment_amount_line or ''],
                             'level': 1,
                             'no_payment_line': no_payment,
@@ -849,7 +846,7 @@ class PaymentJournalReport(models.AbstractModel):
                             last_journal = True
                         i += 1
                     for journal in filter(lambda x: not x.get('show'), journal_array):
-                        supplier_name = not first_line and payment_group.partner_id.name or ''
+                        customer_name = not first_line and payment_group.partner_id.name or ''
                         number = not first_line and payment_group.display_name or ''
                         payment_date = not first_line and datetime.strptime(payment_group.payment_date,
                                                                             DEFAULT_SERVER_DATE_FORMAT).strftime(
@@ -867,7 +864,7 @@ class PaymentJournalReport(models.AbstractModel):
                             'colspan': 0,
                             'name': '',
                             'footnotes': {},
-                            'columns': [number, payment_date, supplier_name, '',
+                            'columns': [number, payment_date, customer_name, '',
                                         journal['code'] + ' ' + self._format(
                                             payment_amount_journal, payment_currency)],
                             'level': 1,
@@ -892,10 +889,10 @@ class PaymentJournalReport(models.AbstractModel):
                 total_payment_amount += total_amount
                 payment_quantity = first_line and payment_quantity + 1 or payment_quantity
         if total_payment_amount:
-            if context.get('detail_level') == 'per_supplier':
-                columns = [_('Total Payment'), '', None, '', self._format(total_payment_amount, used_currency)]
+            if context.get('detail_level') == 'per_customer':
+                columns = [_('Total Receipt'), '', None, '', self._format(total_payment_amount, used_currency)]
             else:
-                columns = [_('Total Payment'), None, '', '', self._format(total_payment_amount, used_currency)]
+                columns = [_('Total Receipt'), None, '', '', self._format(total_payment_amount, used_currency)]
             lines.append({
                 'id': 0,
                 'type': 'total',
@@ -915,14 +912,14 @@ class PaymentJournalReport(models.AbstractModel):
                 'level': 1,
             })
         if payment_quantity:
-            if context.get('detail_level') == 'per_supplier':
-                columns = [_('Total Payment Quantity'), '', None, '', str(payment_quantity)]
+            if context.get('detail_level') == 'per_customer':
+                columns = [_('Total Receipt Quantity'), '', None, '', str(payment_quantity)]
             else:
-                columns = [_('Total Payment Quantity'), None, '', '', str(payment_quantity)]
+                columns = [_('Total Receipt Quantity'), None, '', '', str(payment_quantity)]
             lines.append({
                 'id': 0,
                 'type': 'total',
-                'name': _('Total Payment Quantity'),
+                'name': _('Total Receipt Quantity'),
                 'colspan': 0,
                 'footnotes': {},
                 'columns': columns,
@@ -954,23 +951,19 @@ class PaymentJournalReport(models.AbstractModel):
             total_amout += journal['amount']
         return total_amout
 
-    def has_not_payment_lines(self, lines):
+    def has_no_payment_lines(self, lines):
         return True if filter(lambda x: x.get('no_payment_line', False), lines) else False
 
-    def _get_domain(self, context, supplier=False):
+    def _get_domain(self, context, customer=False):
         state = []
         domain = [('payment_date', '>=', context['date_from']), ('payment_date', '<=', context['date_to']),
-                  ('partner_type', '=', 'supplier')]
-        if context.get('payment_no'):
-            domain += [('name', '=', context.get('payment_no'))]
+                  ('partner_type', '=', 'customer')]
+        if context.get('receipt_no'):
+            domain += [('name', '=', context.get('receipt_no'))]
 
-        if context.get('partner_id') or supplier:
-            partner = supplier and supplier or context.get('partner_id')
+        if context.get('partner_id') or customer:
+            partner = customer and customer or context.get('partner_id')
             domain += [('partner_id', '=', partner)]
-
-        if context.get('analytic_tag_id'):
-            domain += [
-                ('partner_id.supplier_analytic_tag_ids', 'in', context.get('analytic_tag_id'))]
 
         if context.get('journal_ids'):
             domain += [
@@ -995,11 +988,11 @@ class PaymentJournalReport(models.AbstractModel):
 
     @api.model
     def get_title(self):
-        return _("Payment Journal")
+        return _("Receipt Journal")
 
     @api.model
     def get_name(self):
-        return 'payment_journal'
+        return 'receipt_journal'
 
     @api.model
     def get_report_type(self):
@@ -1009,20 +1002,19 @@ class PaymentJournalReport(models.AbstractModel):
         return 'receipt_and_payment_journal_report.report_receipt_and_payment_journal'
 
 
-class PaymentJournalContextReport(models.TransientModel):
-    _name = "payment.journal.context.report"
-    _description = "A particular context for the payment journal"
+class ReceiptJournalContextReport(models.TransientModel):
+    _name = "receipt.journal.context.report"
+    _description = "A particular context for the receipt journal"
     _inherit = "account.report.context.common"
 
     wizard_id = fields.Integer(string='Payment Journal Wizard')
-    payment_no = fields.Char('Payment No')
+    receipt_no = fields.Char('Receipt No')
     journal_ids = fields.Many2many('account.journal', string='Journals')
-    partner_id = fields.Many2one('res.partner', 'Supplier')
-    analytic_tag_id = fields.Many2one('account.analytic.tag', string='Analytic Tag (From Supplier)')
+    partner_id = fields.Many2one('res.partner', 'Customer')
     reference = fields.Char('Reference')
     confirmed = fields.Boolean('Confirmed')
     posted = fields.Boolean('Posted')
-    detail_level = fields.Selection([('per_supplier', 'Per Supplier'), ('overview', 'Overview')], 'Detail Level')
+    detail_level = fields.Selection([('per_customer', 'Per Customer'), ('overview', 'Overview')], 'Detail Level')
 
     @api.multi
     def get_html_and_data(self, given_context=None):
@@ -1040,20 +1032,19 @@ class PaymentJournalContextReport(models.TransientModel):
                 if wizard and self.wizard_id != wizard.id:
                     self.write({'date_from': wizard.start_date,
                                 'date_to': wizard.end_date,
-                                'payment_no': wizard.payment_no,
+                                'receipt_no': wizard.receipt_no,
                                 'journal_ids': [(6, 0, wizard.journal_ids.ids)],
                                 'partner_id': wizard.partner_id.id,
-                                'analytic_tag_id': wizard.analytic_tag_id.id,
                                 'reference': wizard.reference,
                                 'confirmed': wizard.confirmed,
                                 'posted': wizard.posted,
-                                'detail_level': wizard.detail_level_p,
+                                'detail_level': wizard.detail_level_r,
                                 'date_filter': 'custom',
                                 'wizard_id': wizard.id,
                                 })
         lines = self.get_report_obj().get_lines(self)
         total_payment_journal_lines = self.get_report_obj().get_payment_journal_lines(lines)
-        has_payment = self.get_report_obj().has_not_payment_lines(lines)
+        has_payment = self.get_report_obj().has_no_payment_lines(lines)
         rcontext = {
             'res_company': self.env['res.users'].browse(self.env.uid).company_id,
             'context': self.with_context(**given_context),
@@ -1095,16 +1086,16 @@ class PaymentJournalContextReport(models.TransientModel):
         return result
 
     def get_report_obj(self):
-        return self.env['payment.journal.report']
+        return self.env['receipt.journal.report']
 
     def get_columns_names(self):
-        return [_("Pay. No"), _("Pay. Date"), _("Supplier"), _("Invoice No"), _("Pay. Amount")]
+        return [_("Receipt No"), _("Pay. Date"), _("Customer"), _("Invoice No"), _("Pay. Amount")]
 
     def get_per_partner_columns_names(self):
-        return [_("Pay. No"), _("Pay. Date"), _("Invoice No"), _("Pay. Amount")]
+        return [_("Receipt No"), _("Pay. Date"), _("Invoice No"), _("Pay. Amount")]
 
     def get_per_partner_xlsx_columns_names(self):
-        return [_("Supplier"), _("Pay. No"), _("Pay. Date"), _("Invoice No"), _("Pay. Amount"), _("Pay. Total")]
+        return [_("Customer"), _("Receipt No"), _("Pay. Date"), _("Invoice No"), _("Pay. Amount"), _("Receipt Total")]
 
     @api.multi
     def get_columns_types(self):
@@ -1159,7 +1150,7 @@ class PaymentJournalContextReport(models.TransientModel):
         sheet.set_column(2, 0, 40)
         sheet.set_column(3, 0, 30)
         sheet.set_column(4, 0, 20)
-        if self.detail_level == 'per_supplier':
+        if self.detail_level == 'per_customer':
             sheet.set_column(1, 0, 50)
             sheet.set_column(2, 0, 20)
             sheet.set_column(5, 0, 15)
@@ -1179,7 +1170,7 @@ class PaymentJournalContextReport(models.TransientModel):
             y_offset += 1
 
         columns_names = self.with_context(is_xls=True).get_columns_names()
-        if self.detail_level == 'per_supplier':
+        if self.detail_level == 'per_customer':
             columns_names = self.with_context(is_xls=True).get_per_partner_xlsx_columns_names()
 
         x = 0
@@ -1194,7 +1185,7 @@ class PaymentJournalContextReport(models.TransientModel):
         lines = report_id.with_context(no_format=True, print_mode=True, xlsx_format=True).get_lines(self)
         journal_lines = report_id.with_context(no_format=True, print_mode=True,
                                                xlsx_format=True).get_payment_journal_lines(lines)
-        has_payment = report_id.has_not_payment_lines(lines)
+        has_payment = report_id.has_no_payment_lines(lines)
 
         if lines:
             max_width = max([len(l['columns']) for l in lines])
@@ -1258,7 +1249,7 @@ class PaymentJournalContextReport(models.TransientModel):
         journal_letter_right = 'C'
         total_letter_right = 'E'
         total_letter_left = 'D'
-        if self.detail_level == 'per_supplier':
+        if self.detail_level == 'per_customer':
             total_letter_left = 'E'
             journal_letter_right = 'D'
             total_letter_right = 'F'
@@ -1294,7 +1285,7 @@ class PaymentJournalContextReport(models.TransientModel):
         lines = report_obj.with_context(print_mode=True).get_lines(self)
         journal_lines = report_obj.get_payment_journal_lines(lines)
         footnotes = self.get_footnotes_from_lines(lines)
-        has_payment = report_obj.has_not_payment_lines(lines)
+        has_payment = report_obj.has_no_payment_lines(lines)
         base_url = self.env['ir.config_parameter'].sudo().get_param('report.url') or self.env[
             'ir.config_parameter'].sudo().get_param('web.base.url')
         rcontext = {
@@ -1326,7 +1317,7 @@ class PaymentJournalContextReport(models.TransientModel):
                                                                           'data-report-header-spacing': 10})
 
     def get_full_date_names(self, dt_to, dt_from=None):
-        res = super(PaymentJournalContextReport, self).get_full_date_names(dt_to, dt_from)
+        res = super(ReceiptJournalContextReport, self).get_full_date_names(dt_to, dt_from)
         if dt_from:
             return res.replace('From', 'Period:').replace('to', '-').replace('<br/>', '')
 
@@ -1338,13 +1329,8 @@ class PaymentJournalContextReport(models.TransientModel):
 
     def get_partner(self, partner_id):
         if partner_id:
-            return _('Supplier: %s') % partner_id.name
-        return _('Supplier:')
-
-    def get_analytic_tag(self, analytic_tag_id):
-        if analytic_tag_id:
-            return _('Analytic Tags: %s') % analytic_tag_id.name
-        return _('Analytic Tags:')
+            return _('Customer: %s') % partner_id.name
+        return _('Customer:')
 
     def get_status(self, confirmed, posted):
         states = {}
@@ -1358,4 +1344,4 @@ class PaymentJournalContextReport(models.TransientModel):
         return _('Status:')
 
     def get_detail_level(self, detail_level):
-        return _('Detail Level: %s') % (_('Overview') if detail_level == 'overview' else _('Per Supplier'))
+        return _('Detail Level: %s') % (_('Overview') if detail_level == 'overview' else _('Per Customer'))
