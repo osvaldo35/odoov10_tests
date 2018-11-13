@@ -47,10 +47,10 @@ class MecradoPagoPayment():
                                },
                 }
 
-        print("--------data--------",data)
-        print("-----url data------",self.url, public_key)
+        # print("--------data--------",data)
+        # print("-----url data------",self.url, public_key)
         card_token = requests.post("%s/v1/card_tokens?public_key=%s"% (self.url, public_key), headers={"content-type":"application/json"}, data=json.dumps(data))
-        print("-----card token------",card_token, card_token.json())
+        # print("-----card token------",card_token, card_token.json())
         if card_token:
             if acquirer.save_token and acquirer.save_token == "none":
                 pass
@@ -85,7 +85,7 @@ class MecradoPagoPayment():
                 }
         # print("-----data----",data)
         create_response = mp.post("/v1/customers", data)
-        print("------create_response-------",create_response)
+        # print("------create_response-------",create_response)
         return create_response.get('response')
 
     def _set_customer_card(self, mercadopago_profile_id, acquirer, card_token):
@@ -96,7 +96,7 @@ class MecradoPagoPayment():
             #     access_token = self.accessToken
             mp = self.mp
             create_card = mp.post("/v1/customers/"+mercadopago_profile_id+"/cards", {'token' : card_token.get('id')})
-            print("------create_card--------",create_card)
+            # print("------create_card--------",create_card)
             return create_card.get("response")
 
     def mercadopago_payment(self, transaction):
@@ -107,7 +107,7 @@ class MecradoPagoPayment():
             #     access_token = self.accessToken
             # mp = mercadopago.MP(access_token)
             mp = self.mp
-            print("-------mp-----",mp)
+            # print("-------mp-----",mp)
             first_name = ''
             last_name = ''
             if transaction.partner_id.name:
@@ -130,7 +130,7 @@ class MecradoPagoPayment():
                                         },
                             "capture" : True
                             }
-            print("---------payment_data--------",payment_data)
+            # print("---------payment_data--------",payment_data)
 
             payment_response = mp.post("/v1/payments", payment_data)
             # print("---------payment_response--------",payment_response)
@@ -150,7 +150,7 @@ class MecradoPagoPayment():
             elif data.get('payment_method') == "bank_transfer" and data.get('payment_type_bank'):
                 payment_type = 'ticket'
                 payment_method=data.get('payment_type_bank')
-            print("inside mercadopago manual payment : ", payment_method)
+            # print("inside mercadopago manual payment : ", payment_method)
             # 2/0
             first_name = ''
             last_name = ''
@@ -173,7 +173,7 @@ class MecradoPagoPayment():
                                       },
                             "capture": True
                             }
-            print("---------payment_data--------", payment_data)
+            # print("---------payment_data--------", payment_data)
             payment_response = mp.post("/v1/payments", payment_data)
             return payment_response.get('response')
 

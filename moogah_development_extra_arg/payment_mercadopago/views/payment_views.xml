@@ -47,6 +47,12 @@
                 </div>
                 <!--</group>-->
             </xpath>
+
+            <xpath expr="//field[@name='journal_id']" position="attributes">
+                <attribute name="attrs">{'required': [('auto_confirm', 'in', ('generate_and_pay_invoice','confirm_order_draft_acquirer'))], 'invisible': [('auto_confirm', 'not in',('generate_and_pay_invoice','confirm_order_draft_acquirer'))]}
+
+                </attribute>
+            </xpath>
         </field>
     </record>
 

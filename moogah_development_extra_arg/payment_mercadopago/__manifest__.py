@@ -5,7 +5,7 @@
     'author' : 'TechUltra Solutions',
     'website' : 'www.techultrasolutions.com',
     'summary': 'Payment Acquirer: MercadoPago Implementation',
-    'version': '1.1',
+    'version': '1.2',
     'description': """MercadoPago Payment Acquirer""",
     'depends': ['payment', 'website', 'website_sale'],
     'data': [
