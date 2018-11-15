@@ -20,7 +20,7 @@
 ##############################################################################
 {
     'name': 'Account Check Management',
-    'version': '10.0.1.6.3',
+    'version': '10.0.1.6.4',
     'category': 'Accounting',
     'summary': 'Accounting, Payment, Check, Third, Issue',
     'author': 'Bacgroup, OpenERP Team de Localizacion Argentina',

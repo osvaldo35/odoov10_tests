@@ -75,8 +75,10 @@ class sire_report(models.TransientModel):
                     tstr += "{:<11}".format(pay.partner_id.main_id_number)
 
 
-                    tmpstr = remove_accents(pay.partner_id.name[0:20])
-
+                    if pay.partner_id.name:
+                        tmpstr = remove_accents(pay.partner_id.name[0:20])
+                    else:
+                        tmpstr = ""
 
                     tstr += "{:<20}".format(tmpstr)
                     street = ""
@@ -85,12 +87,18 @@ class sire_report(models.TransientModel):
                     if pay.partner_id.street2:
                         street += pay.partner_id.street2
 
-                    tmpstr = remove_accents(street[0:20])
+                    if street:
+                        tmpstr = remove_accents(street[0:20])
+                    else:
+                        tmpstr = ""
 
                     tstr += "{:<20}".format(tmpstr)
                     tmp = pay.partner_id.city
 
-                    tmpstr = remove_accents(tmp[0:20])
+                    if tmp:
+                        tmpstr = remove_accents(tmp[0:20])
+                    else:
+                        tmpstr = ""
 
                     tstr += "{:<20}".format(tmpstr)
                     tstr += "{:0>2}".format(pay.partner_id.state_id.afip_code)
