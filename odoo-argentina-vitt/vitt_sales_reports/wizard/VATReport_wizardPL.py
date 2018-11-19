@@ -134,7 +134,7 @@ class sales_reports(models.TransientModel):
             domain.append(('journal_id.id', 'in', list(self.journal_ids._ids)))
 
         invoiceModel = self.env['account.invoice']
-        invoices = invoiceModel.search(domain,order="date_invoice")
+        invoices = invoiceModel.search(domain,order="date_invoice,display_name2")
         vatarray = self.gettotalsperVAT(invoices)
         vattot = {}
 
