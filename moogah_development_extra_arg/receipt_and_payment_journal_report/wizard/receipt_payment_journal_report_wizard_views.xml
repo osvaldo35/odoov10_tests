@@ -13,6 +13,7 @@
                             <field name="end_date"/>
                         </group>
                         <group>
+                            <field name="company_id" groups="base.group_multi_company"/>
                             <field name="payment_no" attrs="{'invisible': [('type', '!=', 'payment')]}"/>
                             <field name="receipt_no" attrs="{'invisible': [('type', '!=', 'receipt')]}"/>
                         </group>
@@ -25,7 +26,8 @@
                             <field name="partner_id" options="{'no_create_edit': True}"/>
                             <field name="reference"/>
                             <separator colspan="2" string="Status"/>
-                            <field name="confirmed"/>
+                            <field name="draft" attrs="{'invisible': [('type', '!=', 'receipt')]}"/>
+                            <field name="confirmed" attrs="{'invisible': [('type', '!=', 'payment')]}"/>
                             <field name="posted"/>
                         </group>
                         <group>

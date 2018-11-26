@@ -35,9 +35,11 @@ class ReceiptJournalReport(models.AbstractModel):
             'journal_ids': context_id.journal_ids.ids,
             'partner_id': context_id.partner_id.id,
             'reference': context_id.reference,
+            'draft': context_id.draft,
             'confirmed': context_id.confirmed,
             'posted': context_id.posted,
             'detail_level': context_id.detail_level,
+            'company_id': context_id.company_id.id,
         })
         if new_context.get('xlsx_format'):
             if new_context.get('detail_level') == 'per_customer':
@@ -61,6 +63,8 @@ class ReceiptJournalReport(models.AbstractModel):
         apg_obj = self.env['account.payment.group']
         partner_obj = self.env['res.partner']
         used_currency = self.env.user.company_id.currency_id
+        if context.get('company_id'):
+            used_currency = self.env['res.company'].browse(context.get('company_id')).currency_id
         customers = partner_obj.search([('customer', '=', True)])
         if context.get('partner_id'):
             customers = partner_obj.browse(context.get('partner_id'))
@@ -73,8 +77,8 @@ class ReceiptJournalReport(models.AbstractModel):
                 payment_currency = payment_group.currency2_id and payment_group.currency2_id \
                                    or payment_group.currency_id
                 move_lines = payment_group.matched_move_line_ids.filtered(lambda x: x.invoice_id)
-                if payment_group.state == 'confirmed':
-                    move_lines = payment_group.to_pay_move_line_ids.filtered(lambda x: x.invoice_id)
+                if payment_group.state == 'draft':
+                    move_lines = payment_group.debt_move_line_ids.filtered(lambda x: x.invoice_id)
                 journals = payment_group.payment_ids.mapped('journal_id')
                 if context.get('journal_ids'):
                     journals = payment_group.payment_ids.filtered(
@@ -82,7 +86,10 @@ class ReceiptJournalReport(models.AbstractModel):
                 if len(journals.ids) == 1:
                     payment_amount = sum(payment_group.payment_ids.filtered(
                         lambda x: x.journal_id == journals).mapped('amount'))
-                    currency_amount = payment_currency.compute(payment_amount, used_currency)
+                    currency_amount = payment_amount
+                    if payment_group.payment_ids[0].currency_id != used_currency:
+                        currency_amount = currency_amount * payment_group.manual_currency_rate
+                    # currency_amount = payment_currency.compute(payment_amount, used_currency)
                     total_amount += currency_amount
                     for move_line in move_lines:
                         number = not first_line and payment_group.display_name or ''
@@ -103,7 +110,7 @@ class ReceiptJournalReport(models.AbstractModel):
                             'columns': [customer_name, number, payment_date,
                                         move_line.invoice_id.display_name,
                                         not first_line and
-                                        self._format(payment_amount, payment_currency) or '',
+                                        self._format(payment_amount, payment_group.payment_ids[0].currency_id) or '',
                                         not first_line and
                                         self._format(total_amount, used_currency) or ''],
                             'level': 1,
@@ -124,7 +131,7 @@ class ReceiptJournalReport(models.AbstractModel):
                             'colspan': 0,
                             'footnotes': {},
                             'columns': [customer.name, payment_group.display_name, payment_date,
-                                        '', self._format(payment_amount, payment_currency),
+                                        '', self._format(payment_amount, payment_group.payment_ids[0].currency_id),
                                         self._format(total_amount, used_currency)],
                             'level': 1,
                         })
@@ -133,15 +140,22 @@ class ReceiptJournalReport(models.AbstractModel):
                 else:
                     journal_array = []
                     for journal in journals:
+                        journal_currency = payment_group.payment_ids.filtered(
+                            lambda x: x.journal_id == journal).mapped('currency_id')
                         amount = sum(payment_group.payment_ids.filtered(
                             lambda x: x.journal_id == journal).mapped('amount'))
-                        journal_array.append({'journal_id': journal.id, 'amount': amount, 'code': journal.code})
+                        journal_array.append({'journal_id': journal.id, 'amount': amount, 'code': journal.code,
+                                              'journal_currency': journal_currency})
 
                     last_journal = False
                     payment_amount_journal = journal_array[0]['amount'] if journal_array else 0.0
+                    journal_currency = journal_array[0]['journal_currency'] if journal_array else payment_currency
                     currency_total_payment = self._get_total_amount_xlsx_per_supplier(
                         journal_array) if journal_array else 0.0
-                    total_amount = payment_currency.compute(currency_total_payment, used_currency)
+                    total_amount = currency_total_payment
+                    if journal_currency != used_currency:
+                        total_amount = currency_total_payment * payment_group.manual_currency_rate
+                    # total_amount = payment_currency.compute(currency_total_payment, used_currency)
                     i = 0
                     for move_line in move_lines:
                         number = not first_line and payment_group.display_name or ''
@@ -151,14 +165,19 @@ class ReceiptJournalReport(models.AbstractModel):
                         customer_name = not first_line and customer.name or ''
                         if not last_journal:
                             payment_amount_journal = journal_array[i]['amount'] if journal_array else 0.0
-                            currency_amount_journal = payment_currency.compute(
-                                payment_amount_journal, used_currency)
+                            journal_currency = journal_array[i][
+                                'journal_currency'] if journal_array else payment_currency
+                            currency_amount_journal = payment_amount_journal
+                            if journal_currency != used_currency:
+                                currency_amount_journal = currency_amount_journal * payment_group.manual_currency_rate
+                            # currency_amount_journal = payment_currency.compute(
+                            #     payment_amount_journal, used_currency)
                         else:
                             i = len(journal_array) - 1
 
                         if journal_array:
                             journal_payment_amount_line = journal_array[i]['code'] + ' ' + \
-                                                          self._format(payment_amount_journal, payment_currency)
+                                                          self._format(payment_amount_journal, journal_currency)
                             no_payment = False
                         else:
                             journal_payment_amount_line = self._format(payment_amount_journal,
@@ -196,7 +215,10 @@ class ReceiptJournalReport(models.AbstractModel):
                             date_format) or None
                         customer_name = not first_line and customer.name or ''
                         payment_amount_journal = journal['amount']
-                        currency_amount_journal = payment_currency.compute(payment_amount_journal, used_currency)
+                        currency_amount_journal = payment_amount_journal
+                        if journal['journal_currency'] != used_currency:
+                            currency_amount_journal = currency_amount_journal * payment_group.manual_currency_rate
+                        # currency_amount_journal = payment_currency.compute(payment_amount_journal, used_currency)
                         lines.append({
                             'id': journal['journal_id'],
                             'type': 'line_id',
@@ -208,7 +230,7 @@ class ReceiptJournalReport(models.AbstractModel):
                             'name': 'Line',
                             'footnotes': {},
                             'columns': [customer_name, number, payment_date, '', journal['code'] + ' ' +
-                                        self._format(payment_amount_journal, payment_group.currency_id),
+                                        self._format(payment_amount_journal, journal['journal_currency']),
                                         not first_line and self._format(total_amount, used_currency) or ''],
                             'level': 1,
                         })
@@ -216,15 +238,7 @@ class ReceiptJournalReport(models.AbstractModel):
                             first_line = True
 
                 if first_line:
-                    lines.append({
-                        'id': 0,
-                        'type': 'line_id',
-                        'name': '',
-                        'colspan': 0,
-                        'footnotes': {},
-                        'columns': ['', '', None, '', '', ''],
-                        'level': 1,
-                    })
+                    lines.append(self._get_line_space('per_customer', 'xlsx'))
 
                 total_payment_journal_amount += total_amount
                 payment_quantity = first_line and payment_quantity + 1 or payment_quantity
@@ -239,15 +253,7 @@ class ReceiptJournalReport(models.AbstractModel):
                             self._format(total_payment_journal_amount, used_currency)],
                 'level': 1,
             })
-            lines.append({
-                'id': 0,
-                'type': 'line_id',
-                'name': '',
-                'colspan': 0,
-                'footnotes': {},
-                'columns': ['', '', None, '', '', ''],
-                'level': 1,
-            })
+            lines.append(self._get_line_space('per_customer', 'xlsx'))
         if payment_quantity:
             lines.append({
                 'id': 0,
@@ -268,6 +274,8 @@ class ReceiptJournalReport(models.AbstractModel):
         lang_id = lang._lang_get(lang_code)
         date_format = lang_id.date_format
         used_currency = self.env.user.company_id.currency_id
+        if context.get('company_id'):
+            used_currency = self.env['res.company'].browse(context.get('company_id')).currency_id
         lines = []
         payment_quantity = 0
         first_line = False
@@ -281,8 +289,8 @@ class ReceiptJournalReport(models.AbstractModel):
             first_line = False
             total_amount = 0.0
             move_lines = payment_group.matched_move_line_ids.filtered(lambda x: x.invoice_id)
-            if payment_group.state == 'confirmed':
-                move_lines = payment_group.to_pay_move_line_ids.filtered(lambda x: x.invoice_id)
+            if payment_group.state == 'draft':
+                move_lines = payment_group.debt_move_line_ids.filtered(lambda x: x.invoice_id)
             journals = payment_group.payment_ids.mapped('journal_id')
             if context.get('journal_ids'):
                 journals = payment_group.payment_ids.filtered(
@@ -290,7 +298,10 @@ class ReceiptJournalReport(models.AbstractModel):
             if len(journals.ids) == 1:
                 payment_amount = sum(payment_group.payment_ids.filtered(
                     lambda x: x.journal_id == journals).mapped('amount'))
-                currency_amount = payment_currency.compute(payment_amount, used_currency)
+                currency_amount = payment_amount
+                if payment_group.payment_ids[0].currency_id != used_currency:
+                    currency_amount = currency_amount * payment_group.manual_currency_rate
+                # currency_amount = payment_currency.compute(payment_amount, used_currency)
                 total_amount += currency_amount
                 for move_line in move_lines:
                     customer_name = not first_line and payment_group.partner_id.name or ''
@@ -311,7 +322,7 @@ class ReceiptJournalReport(models.AbstractModel):
                         'columns': [number, payment_date, customer_name,
                                     move_line.invoice_id.display_name,
                                     not first_line and
-                                    self._format(payment_amount, payment_currency) or ''],
+                                    self._format(payment_amount, payment_group.payment_ids[0].currency_id) or ''],
                         'level': 1,
                     })
                     first_line = True
@@ -329,7 +340,7 @@ class ReceiptJournalReport(models.AbstractModel):
                         'name': '',
                         'footnotes': {},
                         'columns': [payment_group.display_name, payment_date, payment_group.partner_id.name,
-                                    '', self._format(payment_amount, payment_currency)],
+                                    '', self._format(payment_amount, payment_group.payment_ids[0].currency_id)],
                         'level': 1,
                     })
                     first_line = True
@@ -350,9 +361,12 @@ class ReceiptJournalReport(models.AbstractModel):
             else:
                 journal_array = []
                 for journal in journals:
+                    journal_currency = payment_group.payment_ids.filtered(
+                        lambda x: x.journal_id == journal).mapped('currency_id')
                     amount = sum(payment_group.payment_ids.filtered(
                         lambda x: x.journal_id == journal).mapped('amount'))
-                    journal_array.append({'journal_id': journal.id, 'amount': amount, 'code': journal.code})
+                    journal_array.append({'journal_id': journal.id, 'amount': amount, 'code': journal.code,
+                                          'journal_currency': journal_currency})
 
                 last_journal = False
                 payment_amount_journal = journal_array[0]['amount'] if journal_array else 0.0
@@ -365,15 +379,19 @@ class ReceiptJournalReport(models.AbstractModel):
                         date_format) or None
                     if not last_journal:
                         payment_amount_journal = journal_array[i]['amount'] if journal_array else 0.0
-                        currency_amount_journal = payment_currency.compute(
-                            payment_amount_journal, used_currency)
+                        journal_currency = journal_array[i]['journal_currency'] if journal_array else payment_currency
+                        currency_amount_journal = payment_amount_journal
+                        if journal_currency != used_currency:
+                            currency_amount_journal = currency_amount_journal * payment_group.manual_currency_rate
+                        # currency_amount_journal = payment_currency.compute(
+                        #     payment_amount_journal, used_currency)
                         total_amount += currency_amount_journal
                     else:
                         i = len(journal_array) - 1
 
                     if journal_array:
                         journal_payment_amount_line = journal_array[i]['code'] + ' ' + \
-                                                      self._format(payment_amount_journal, payment_currency)
+                                                      self._format(payment_amount_journal, journal_currency)
                         no_payment = False
                     else:
                         journal_payment_amount_line = self._format(payment_amount_journal,
@@ -409,7 +427,10 @@ class ReceiptJournalReport(models.AbstractModel):
                                                                         DEFAULT_SERVER_DATE_FORMAT).strftime(
                         date_format) or None
                     payment_amount_journal = journal['amount']
-                    currency_amount_journal = payment_currency.compute(payment_amount_journal, used_currency)
+                    currency_amount_journal = payment_amount_journal
+                    if journal['journal_currency'] != used_currency:
+                        currency_amount_journal = currency_amount_journal * payment_group.manual_currency_rate
+                    # currency_amount_journal = payment_currency.compute(payment_amount_journal, used_currency)
                     total_amount += currency_amount_journal
                     lines.append({
                         'id': journal['journal_id'],
@@ -423,7 +444,7 @@ class ReceiptJournalReport(models.AbstractModel):
                         'footnotes': {},
                         'columns': [number, payment_date, customer_name, '',
                                     journal['code'] + ' ' + self._format(
-                                        payment_amount_journal, payment_currency)],
+                                        payment_amount_journal, journal['journal_currency'])],
                         'level': 1,
                     })
                     if not move_lines:
@@ -445,15 +466,7 @@ class ReceiptJournalReport(models.AbstractModel):
             total_payment_amount += total_amount
             payment_quantity = first_line and payment_quantity + 1 or payment_quantity
             if first_line:
-                lines.append({
-                    'id': 0,
-                    'type': 'line_id',
-                    'name': '',
-                    'colspan': 0,
-                    'footnotes': {},
-                    'columns': ['', None, '', '', ''],
-                    'level': 1,
-                })
+                lines.append(self._get_line_space('overview', 'xlsx'))
         if first_line:
             lines.append({
                 'id': 0,
@@ -465,15 +478,7 @@ class ReceiptJournalReport(models.AbstractModel):
                             self._format(total_payment_amount, used_currency)],
                 'level': 1,
             })
-            lines.append({
-                'id': 0,
-                'type': 'line_id',
-                'name': '',
-                'colspan': 0,
-                'footnotes': {},
-                'columns': ['', None, '', '', ''],
-                'level': 1,
-            })
+            lines.append(self._get_line_space('overview', 'xlsx'))
         if payment_quantity:
             lines.append({
                 'id': 0,
@@ -495,6 +500,8 @@ class ReceiptJournalReport(models.AbstractModel):
         lang_id = lang._lang_get(lang_code)
         date_format = lang_id.date_format
         used_currency = self.env.user.company_id.currency_id
+        if context.get('company_id'):
+            used_currency = self.env['res.company'].browse(context.get('company_id')).currency_id
         lines = []
         payment_quantity = 0
         total_payment_amount = 0.0
@@ -526,8 +533,8 @@ class ReceiptJournalReport(models.AbstractModel):
                     payment_currency = payment_group.currency2_id and payment_group.currency2_id \
                                        or payment_group.currency_id
                     move_lines = payment_group.matched_move_line_ids.filtered(lambda x: x.invoice_id)
-                    if payment_group.state == 'confirmed':
-                        move_lines = payment_group.to_pay_move_line_ids.filtered(lambda x: x.invoice_id)
+                    if payment_group.state == 'draft':
+                        move_lines = payment_group.debt_move_line_ids.filtered(lambda x: x.invoice_id)
                     journals = payment_group.payment_ids.mapped('journal_id')
                     if context.get('journal_ids'):
                         journals = payment_group.payment_ids.filtered(
@@ -535,7 +542,10 @@ class ReceiptJournalReport(models.AbstractModel):
                     if len(journals.ids) == 1:
                         payment_amount = sum(payment_group.payment_ids.filtered(
                             lambda x: x.journal_id == journals).mapped('amount'))
-                        currency_amount = payment_currency.compute(payment_amount, used_currency)
+                        currency_amount = payment_amount
+                        if payment_group.payment_ids[0].currency_id != used_currency:
+                            currency_amount = currency_amount * payment_group.manual_currency_rate
+                        # currency_amount = payment_currency.compute(payment_amount, used_currency)
                         total_amount += currency_amount
                         for move_line in move_lines:
                             if not filter(lambda x: x.get('partner_id') and x.get('partner_id') == customer.id, lines):
@@ -557,12 +567,14 @@ class ReceiptJournalReport(models.AbstractModel):
                                 'columns': ['', number, payment_date,
                                             move_line.invoice_id.display_name,
                                             not first_line and
-                                            self._format(payment_amount, payment_currency) or ''],
+                                            self._format(payment_amount, payment_group.payment_ids[0].currency_id) or ''],
                                 'level': 2,
                             })
                             first_line = True
 
                         if not move_lines:
+                            if not filter(lambda x: x.get('partner_id') and x.get('partner_id') == customer.id, lines):
+                                lines.extend(partner_lines)
                             payment_date = datetime.strptime(payment_group.payment_date,
                                                              DEFAULT_SERVER_DATE_FORMAT).strftime(
                                 date_format)
@@ -576,7 +588,7 @@ class ReceiptJournalReport(models.AbstractModel):
                                 'name': '',
                                 'footnotes': {},
                                 'columns': ['', payment_group.display_name, payment_date,
-                                            '', self._format(payment_amount, payment_currency)],
+                                            '', self._format(payment_amount, payment_group.payment_ids[0].currency_id)],
                                 'level': 2,
                             })
                             first_line = True
@@ -596,9 +608,12 @@ class ReceiptJournalReport(models.AbstractModel):
                     else:
                         journal_array = []
                         for journal in journals:
+                            journal_currency = payment_group.payment_ids.filtered(
+                                lambda x: x.journal_id == journal).mapped('currency_id')
                             amount = sum(payment_group.payment_ids.filtered(
                                 lambda x: x.journal_id == journal).mapped('amount'))
-                            journal_array.append({'journal_id': journal.id, 'amount': amount, 'code': journal.code})
+                            journal_array.append({'journal_id': journal.id, 'amount': amount, 'code': journal.code,
+                                                  'journal_currency': journal_currency})
 
                         last_journal = False
                         payment_amount_journal = journal_array[0]['amount'] if journals else 0.0
@@ -612,15 +627,20 @@ class ReceiptJournalReport(models.AbstractModel):
                                 date_format) or None
                             if not last_journal:
                                 payment_amount_journal = journal_array[i]['amount'] if journal_array else 0.0
-                                currency_amount_journal = payment_currency.compute(
-                                    payment_amount_journal, used_currency)
+                                journal_currency = journal_array[i][
+                                    'journal_currency'] if journal_array else payment_currency
+                                currency_amount_journal = payment_amount_journal
+                                if journal_currency != used_currency:
+                                    currency_amount_journal = currency_amount_journal * payment_group.manual_currency_rate
+                                # currency_amount_journal = payment_currency.compute(
+                                #     payment_amount_journal, used_currency)
                                 total_amount += currency_amount_journal
                             else:
                                 i = len(journal_array) - 1
 
                             if journal_array:
                                 journal_payment_amount_line = journal_array[i]['code'] + ' ' + \
-                                                              self._format(payment_amount_journal, payment_currency)
+                                                              self._format(payment_amount_journal, journal_currency)
                                 no_payment = False
                             else:
                                 journal_payment_amount_line = self._format(payment_amount_journal,
@@ -658,7 +678,10 @@ class ReceiptJournalReport(models.AbstractModel):
                                                                                 DEFAULT_SERVER_DATE_FORMAT).strftime(
                                 date_format) or None
                             payment_amount_journal = journal['amount']
-                            currency_amount_journal = payment_currency.compute(payment_amount_journal, used_currency)
+                            currency_amount_journal = payment_amount_journal
+                            if journal['journal_currency'] != used_currency:
+                                currency_amount_journal = currency_amount_journal * payment_group.manual_currency_rate
+                            # currency_amount_journal = payment_currency.compute(payment_amount_journal, used_currency)
                             total_amount += currency_amount_journal
                             lines.append({
                                 'id': journal['journal_id'],
@@ -671,7 +694,7 @@ class ReceiptJournalReport(models.AbstractModel):
                                 'name': '',
                                 'footnotes': {},
                                 'columns': ['', number, payment_date, '', journal['code'] + ' ' +
-                                            self._format(payment_amount_journal, payment_currency)],
+                                            self._format(payment_amount_journal, journal['journal_currency'])],
                                 'level': 2,
                             })
                             if not move_lines:
@@ -704,15 +727,8 @@ class ReceiptJournalReport(models.AbstractModel):
                                      "", "border-top:1px solid;")],
                         'level': 1,
                     })
-                    lines.append({
-                        'id': 0,
-                        'type': 'line_id',
-                        'name': '',
-                        'colspan': 0,
-                        'footnotes': {},
-                        'columns': ['', '', None, '', ''],
-                        'level': 1,
-                    })
+                    lines.append(self._get_line_space('per_customer'))
+
         else:
             domain = self._get_domain(context)
             sorted_apg = apg_obj.search(domain)
@@ -722,8 +738,8 @@ class ReceiptJournalReport(models.AbstractModel):
                 first_line = False
                 total_amount = 0.0
                 move_lines = payment_group.matched_move_line_ids.filtered(lambda x: x.invoice_id)
-                if payment_group.state == 'confirmed':
-                    move_lines = payment_group.to_pay_move_line_ids.filtered(lambda x: x.invoice_id)
+                if payment_group.state == 'draft':
+                    move_lines = payment_group.debt_move_line_ids.filtered(lambda x: x.invoice_id)
                 journals = payment_group.payment_ids.mapped('journal_id')
                 if context.get('journal_ids'):
                     journals = payment_group.payment_ids.filtered(
@@ -731,7 +747,10 @@ class ReceiptJournalReport(models.AbstractModel):
                 if len(journals.ids) == 1:
                     payment_amount = sum(payment_group.payment_ids.filtered(
                         lambda x: x.journal_id == journals).mapped('amount'))
-                    currency_amount = payment_currency.compute(payment_amount, used_currency)
+                    currency_amount = payment_amount
+                    if payment_group.payment_ids[0].currency_id != used_currency:
+                        currency_amount = currency_amount * payment_group.manual_currency_rate
+                    # currency_amount = payment_currency.compute(payment_amount, used_currency)
                     total_amount += currency_amount
                     for move_line in move_lines:
                         customer_name = not first_line and payment_group.partner_id.name or ''
@@ -752,7 +771,7 @@ class ReceiptJournalReport(models.AbstractModel):
                             'columns': [number, payment_date, customer_name,
                                         move_line.invoice_id.display_name,
                                         not first_line and
-                                        self._format(payment_amount, payment_currency) or ''],
+                                        self._format(payment_amount, payment_group.payment_ids[0].currency_id) or ''],
                             'level': 1,
                         })
                         first_line = True
@@ -771,7 +790,7 @@ class ReceiptJournalReport(models.AbstractModel):
                             'name': '',
                             'footnotes': {},
                             'columns': [payment_group.display_name, payment_date, payment_group.partner_id.name,
-                                        '', self._format(payment_amount, payment_currency)],
+                                        '', self._format(payment_amount, payment_group.payment_ids[0].currency_id)],
                             'level': 1,
                         })
                         first_line = True
@@ -793,9 +812,12 @@ class ReceiptJournalReport(models.AbstractModel):
                 else:
                     journal_array = []
                     for journal in journals:
+                        journal_currency = payment_group.payment_ids.filtered(
+                            lambda x: x.journal_id == journal).mapped('currency_id')
                         amount = sum(payment_group.payment_ids.filtered(
                             lambda x: x.journal_id == journal).mapped('amount'))
-                        journal_array.append({'journal_id': journal.id, 'amount': amount, 'code': journal.code})
+                        journal_array.append({'journal_id': journal.id, 'amount': amount, 'code': journal.code,
+                                              'journal_currency': journal_currency})
 
                     last_journal = False
                     payment_amount_journal = journal_array[0]['amount'] if journals else 0.0
@@ -808,15 +830,20 @@ class ReceiptJournalReport(models.AbstractModel):
                             date_format) or None
                         if not last_journal:
                             payment_amount_journal = journal_array[i]['amount'] if journal_array else 0.0
-                            currency_amount_journal = payment_currency.compute(
-                                payment_amount_journal, used_currency)
+                            journal_currency = journal_array[i][
+                                'journal_currency'] if journal_array else payment_currency
+                            currency_amount_journal = payment_amount_journal
+                            if journal_currency != used_currency:
+                                currency_amount_journal = currency_amount_journal * payment_group.manual_currency_rate
+                            # currency_amount_journal = payment_currency.compute(
+                            #     payment_amount_journal, used_currency)
                             total_amount += currency_amount_journal
                         else:
                             i = len(journal_array) - 1
 
                         if journal_array:
                             journal_payment_amount_line = journal_array[i]['code'] + ' ' + \
-                                                          self._format(payment_amount_journal, payment_currency)
+                                                          self._format(payment_amount_journal, journal_currency)
                             no_payment = False
                         else:
                             journal_payment_amount_line = self._format(payment_amount_journal,
@@ -852,7 +879,10 @@ class ReceiptJournalReport(models.AbstractModel):
                                                                             DEFAULT_SERVER_DATE_FORMAT).strftime(
                             date_format) or None
                         payment_amount_journal = journal['amount']
-                        currency_amount_journal = payment_currency.compute(payment_amount_journal, used_currency)
+                        currency_amount_journal = payment_amount_journal
+                        if journal['journal_currency'] != used_currency:
+                            currency_amount_journal = currency_amount_journal * payment_group.manual_currency_rate
+                        # currency_amount_journal = payment_currency.compute(payment_amount_journal, used_currency)
                         total_amount += currency_amount_journal
                         lines.append({
                             'id': journal['journal_id'],
@@ -866,7 +896,7 @@ class ReceiptJournalReport(models.AbstractModel):
                             'footnotes': {},
                             'columns': [number, payment_date, customer_name, '',
                                         journal['code'] + ' ' + self._format(
-                                            payment_amount_journal, payment_currency)],
+                                            payment_amount_journal, journal['journal_currency'])],
                             'level': 1,
                         })
                         if not move_lines:
@@ -902,15 +932,7 @@ class ReceiptJournalReport(models.AbstractModel):
                 'columns': columns,
                 'level': 0,
             })
-            lines.append({
-                'id': 0,
-                'type': 'line',
-                'name': '',
-                'colspan': 0,
-                'footnotes': {},
-                'columns': ['', None, '', '', ''],
-                'level': 1,
-            })
+            lines.append(self._get_line_space('overview'))
         if payment_quantity:
             if context.get('detail_level') == 'per_customer':
                 columns = [_('Total Receipt Quantity'), '', None, '', str(payment_quantity)]
@@ -927,6 +949,23 @@ class ReceiptJournalReport(models.AbstractModel):
             })
 
         return lines
+
+    def _get_line_space(self, level, report_type='html'):
+        if level == 'per_customer' and report_type == 'html':
+            columns = ['', '', None, '', '']
+        elif level == 'per_customer' and report_type == 'xlsx':
+            columns = ['', '', None, '', '', '']
+        else:
+            columns = ['', None, '', '', '']
+        return {
+            'id': 0,
+            'type': 'line_id' if report_type == 'xlsx' else 'line',
+            'name': '',
+            'colspan': 0,
+            'footnotes': {},
+            'columns': columns,
+            'level': 1,
+        }
 
     def get_payment_journal_lines(self, lines):
         total_journal_lines = []
@@ -973,16 +1012,16 @@ class ReceiptJournalReport(models.AbstractModel):
             domain += [
                 ('communication', '=', context.get('reference'))]
 
-        if context.get('reference'):
-            domain += [
-                ('communication', '=', context.get('reference'))]
-
-        if context.get('confirmed', False):
-            state.append('confirmed')
-
+        if context.get('draft', False):
+            state.append('draft')
         if context.get('posted', False):
             state.append('posted')
-        domain += [('state', 'in', state)] if state else [('state', '!=', 'draft')]
+        if state:
+            domain += [('state', 'in', state)]
+
+        if context.get('company_id'):
+            domain += [
+                ('company_id', '=', context.get('company_id'))]
 
         return domain
 
@@ -1012,9 +1051,11 @@ class ReceiptJournalContextReport(models.TransientModel):
     journal_ids = fields.Many2many('account.journal', string='Journals')
     partner_id = fields.Many2one('res.partner', 'Customer')
     reference = fields.Char('Reference')
+    draft = fields.Boolean('Draft')
     confirmed = fields.Boolean('Confirmed')
     posted = fields.Boolean('Posted')
     detail_level = fields.Selection([('per_customer', 'Per Customer'), ('overview', 'Overview')], 'Detail Level')
+    company_id = fields.Many2one('res.company', 'Company')
 
     @api.multi
     def get_html_and_data(self, given_context=None):
@@ -1036,11 +1077,13 @@ class ReceiptJournalContextReport(models.TransientModel):
                                 'journal_ids': [(6, 0, wizard.journal_ids.ids)],
                                 'partner_id': wizard.partner_id.id,
                                 'reference': wizard.reference,
+                                'draft': wizard.draft,
                                 'confirmed': wizard.confirmed,
                                 'posted': wizard.posted,
                                 'detail_level': wizard.detail_level_r,
                                 'date_filter': 'custom',
                                 'wizard_id': wizard.id,
+                                'company_id': wizard.company_id.id,
                                 })
         lines = self.get_report_obj().get_lines(self)
         total_payment_journal_lines = self.get_report_obj().get_payment_journal_lines(lines)
@@ -1332,10 +1375,10 @@ class ReceiptJournalContextReport(models.TransientModel):
             return _('Customer: %s') % partner_id.name
         return _('Customer:')
 
-    def get_status(self, confirmed, posted):
+    def get_status(self, draft, posted):
         states = {}
-        if confirmed:
-            states['confirmed'] = _('Confirmed')
+        if draft:
+            states['draft'] = _('Draft')
         if posted:
             states['posted'] = _('Posted')
         if states:

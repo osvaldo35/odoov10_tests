@@ -21,6 +21,7 @@ class ReceiptAndPaymentJournalReportWizard(models.TransientModel):
     partner_id = fields.Many2one('res.partner', 'Supplier')
     analytic_tag_id = fields.Many2one('account.analytic.tag', string='Analytic Tag (From Supplier)')
     reference = fields.Char('Reference')
+    draft = fields.Boolean('Draft', default=True)
     confirmed = fields.Boolean('Confirmed', default=True)
     posted = fields.Boolean('Posted', default=True)
     detail_level_p = fields.Selection([('per_supplier', 'Per Supplier'), ('overview', 'Overview')],
@@ -29,6 +30,8 @@ class ReceiptAndPaymentJournalReportWizard(models.TransientModel):
                                       'Detail Level', default='overview')
     type = fields.Selection([('receipt', 'Receipt'), ('payment', 'Payment')],
                             'Type of Report')
+
+    company_id = fields.Many2one('res.company', 'Company')
 
     @api.model
     def fields_view_get(self, view_id=None, view_type='form', toolbar=False, submenu=False):

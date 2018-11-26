@@ -411,3 +411,8 @@ msgstr "Total de Pagos"
 #, python-format
 msgid "Total Receipt"
 msgstr "Total de Recibos"
+
+#. module: receipt_and_payment_journal_report
+#: model:ir.model.fields,field_description:receipt_and_payment_journal_report.field_receipt_and_payment_journal_report_wizard_company_id
+msgid "Company"
+msgstr "Compañia"

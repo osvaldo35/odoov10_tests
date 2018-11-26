@@ -124,7 +124,12 @@
                     </t>
                     <br/>
                     <div class="col-xs-4">
-                        <t t-raw="context.get_status(context.confirmed, context.posted)"/>
+                        <t t-if="context.get_report_obj().get_name() == 'payment_journal'">
+                            <t t-raw="context.get_status(context.confirmed, context.posted)"/>
+                        </t>
+                        <t t-if="context.get_report_obj().get_name() == 'receipt_journal'">
+                            <t t-raw="context.get_status(context.draft, context.posted)"/>
+                        </t>
                     </div>
                     <br/>
                     <div class="col-xs-4">
