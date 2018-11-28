@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <record id="action_account_payments" model="ir.actions.act_window">
-        <field name="name">Receipts WEB</field>
+        <field name="name">Receipts Standard</field>
         <field name="res_model">account.payment</field>
         <field name="view_type">form</field>
         <field name="view_mode">tree,form,graph</field>
@@ -17,9 +17,8 @@
         </field>
     </record>
 
-<!--
     <record id="action_account_payments_payable" model="ir.actions.act_window">
-        <field name="name">Payments WEB</field>
+        <field name="name">Payments Standard</field>
         <field name="res_model">account.payment</field>
         <field name="view_type">form</field>
         <field name="view_mode">tree,form,graph</field>
@@ -34,7 +33,7 @@
             </p>
         </field>
     </record>
--->
+
     <menuitem action="action_account_payments" id="menu_action_account_payments_group_receivable2" parent="account.menu_finance_receivables" sequence="20" groups="account.group_account_user"/>
     <menuitem action="action_account_payments_payable" id="menu_action_account_payments_group_payable2" parent="account.menu_finance_payables" sequence="20" groups="account.group_account_user"/>
 
