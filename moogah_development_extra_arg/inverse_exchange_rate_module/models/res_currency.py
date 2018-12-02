@@ -24,3 +24,9 @@ class res_currency(models.Model):
                 'currency_id': self.id
             })
         return res
+
+
+class ResCurrencyRate(models.Model):
+    _inherit = 'res.currency.rate'
+
+    inverse_rate = fields.Float(string='Inverse Rate', digits=(12, 6))
