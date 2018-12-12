@@ -45,8 +45,9 @@
                     <button name="action_invoice_open" type="object" attrs="{'invisible': ['|', ('state', '!=', 'draft'), ('validation_type', '!=', 'homologation')]}" string="Validar en HOMOLOGACION" class="oe_highlight" groups="base.group_user"/>
                 </button>
                 <field name="point_of_sale_type" invisible="1"/>
-                <field name="state" position="replace">
-                    <field name="state" widget="statusbar" nolabel="1" statusbar_visible="draft,afip,open,paid"/>
+
+                <field name="date_due" position="attributes">
+                    <attribute name="groups"></attribute>
                 </field>
 
                 <notebook>
@@ -72,6 +73,7 @@
                             <field name='afip_message'/>
                             <field name='afip_xml_request' groups="base.group_no_one"/>
                             <field name='afip_xml_response' groups="base.group_no_one"/>
+                            <field name="afip_error_log"/>
                         </group>
                     </page>
                 </notebook>

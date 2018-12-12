@@ -115,13 +115,11 @@ class report_bi_partner_transaction(models.AbstractModel):
                     currency)
                 for cpg in total_currency_customer_payment_group:
                     amount = 0.0
+                    payment_line_currency = cpg.payment_ids and cpg.payment_ids[0].currency_id or cpg.currency2_id
                     amount = sum(cpg.payment_ids.mapped('amount'))
-                    # if cpg.matched_amount != 0.0:
-                    #     amount = cpg.matched_amount
-                    # else:
-                    #     amount = cpg.unmatched_amount
-                    if cpg.currency_id.id != currency.id and cpg.currency_rate:
-                        amount = amount / cpg.currency_rate
+
+                    if payment_line_currency.id != currency.id and cpg.manual_currency_rate:
+                        amount = amount / cpg.manual_currency_rate
                     grand_total_credit += amount
 
                 grand_total_balance = grand_total_debit - grand_total_credit
@@ -171,7 +169,7 @@ class report_bi_partner_transaction(models.AbstractModel):
                         'reference': inv.name,
                         'debit': debit,
                         'credit': credit,
-                        'currency_rate': inv.currency_rate,
+                        'currency_rate': inv.manual_currency_rate,
                         'amount_in_currency': credit if inv.type == "out_refund" else debit,
                     })
 
@@ -190,16 +188,17 @@ class report_bi_partner_transaction(models.AbstractModel):
                 if currency_customer_payment_group or customer_invoices:
                     lines.extend(initial_lines)
                 for cpg in currency_customer_payment_group:
-
+                    payment_line_currency = cpg.currency2_id
                     payment_amount = 0.0
                     for pay in cpg.payment_ids:
                         payment_amount += pay.amount or 0.0
+                        payment_line_currency = pay.currency_id
 
                     debit = 0.0
                     credit = payment_amount
                     amount_in_currency = payment_amount
-                    if cpg.currency_id.id != currency.id and cpg.currency_rate:
-                        credit = credit / cpg.currency_rate
+                    if payment_line_currency.id != currency.id and cpg.manual_currency_rate:
+                        credit = credit / cpg.manual_currency_rate
 
                     globle_dict_list.append({
                         'obj': cpg,
@@ -210,9 +209,9 @@ class report_bi_partner_transaction(models.AbstractModel):
                         'reference': cpg.name,
                         'debit': debit,
                         'credit': credit,
-                        'currency_rate': cpg.currency_rate,
+                        'currency_rate': cpg.manual_currency_rate,
                         'amount_in_currency': amount_in_currency,
-                        'payment_currency': cpg.currency_id,
+                        'payment_currency': payment_line_currency,
                     })
 
                 sorted_globle_dict_list = sorted(globle_dict_list, key=itemgetter('date'))
@@ -373,13 +372,11 @@ class report_bi_partner_transaction(models.AbstractModel):
                     currency)
                 for cpg in total_currency_customer_payment_group:
                     amount = 0.0
+                    payment_line_currency = cpg.payment_ids and cpg.payment_ids[0].currency_id or cpg.currency2_id
                     amount = sum(cpg.payment_ids.mapped('amount'))
-                    # if cpg.matched_amount != 0.0:
-                    #     amount = cpg.matched_amount
-                    # else:
-                    #     amount = cpg.unmatched_amount
-                    if cpg.currency_id.id != currency.id and cpg.currency_rate:
-                        amount = amount / cpg.currency_rate
+
+                    if payment_line_currency.id != currency.id and cpg.manual_currency_rate:
+                        amount = amount / cpg.manual_currency_rate
                     grand_total_credit += amount
 
                 grand_total_balance = grand_total_debit - grand_total_credit
@@ -429,7 +426,7 @@ class report_bi_partner_transaction(models.AbstractModel):
                         'reference': inv.name,
                         'debit': debit,
                         'credit': credit,
-                        'currency_rate': inv.currency_rate,
+                        'currency_rate': inv.manual_currency_rate,
                         'amount_in_currency': credit if inv.type == "out_refund" else debit,
                     })
 
@@ -448,16 +445,17 @@ class report_bi_partner_transaction(models.AbstractModel):
                 if currency_customer_payment_group or customer_invoices:
                     lines.extend(initial_lines)
                 for cpg in currency_customer_payment_group:
-
+                    payment_line_currency = cpg.currency2_id
                     payment_amount = 0.0
                     for pay in cpg.payment_ids:
                         payment_amount += pay.amount or 0.0
+                        payment_line_currency = pay.currency_id
 
                     debit = 0.0
                     credit = payment_amount
                     amount_in_currency = payment_amount
-                    if cpg.currency_id.id != currency.id and cpg.currency_rate:
-                        credit = credit / cpg.currency_rate
+                    if payment_line_currency.id != currency.id and cpg.manual_currency_rate:
+                        credit = credit / cpg.manual_currency_rate
 
                     globle_dict_list.append({
                         'obj': cpg,
@@ -468,9 +466,9 @@ class report_bi_partner_transaction(models.AbstractModel):
                         'reference': cpg.name,
                         'debit': debit,
                         'credit': credit,
-                        'currency_rate': cpg.currency_rate,
+                        'currency_rate': cpg.manual_currency_rate,
                         'amount_in_currency': amount_in_currency,
-                        'payment_currency': cpg.currency_id,
+                        'payment_currency': payment_line_currency,
                     })
 
                 sorted_globle_dict_list = sorted(globle_dict_list, key=itemgetter('date'))
@@ -600,8 +598,8 @@ class report_bi_partner_transaction(models.AbstractModel):
                 currency_amount = credit
                 debit = 0.0
 
-                if payment_group_line.currency_id.id != line_currency.id and payment_group_line.currency_rate:
-                    credit = credit / payment_group_line.currency_rate
+                if payment.currency_id.id != line_currency.id and payment_group_line.manual_currency_rate:
+                    credit = credit / payment_group_line.manual_currency_rate
 
                 balance = debit - credit
 
@@ -623,19 +621,21 @@ class report_bi_partner_transaction(models.AbstractModel):
                     # 'footnotes':self.env.context['context_id']._get_footnotes('move_line_id', payment.id),
                     'footnotes': {},
                     'columns': [payment.payment_date, payment.receiptbook_id.display_name, invoice_number, '',
-                                self._formatted(payment_group_line.currency_rate, 6),
-                                self._format(currency_amount, payment_group_line.currency_id),
+                                self._formatted(payment_group_line.manual_currency_rate, 6),
+                                self._format(currency_amount, payment.currency_id),
                                 self._format(debit, line_currency),
                                 self._format(credit, line_currency), self._format(balance, line_currency)],
                     'level': 1,
                 })
                 #             if payment_group_line.matched_amount != 0.0:
+        payment_line_currency = payment_group_line.payment_ids and payment_group_line.payment_ids[0].currency_id \
+                                or payment_group_line.currency2_id
         for aml in payment_group_line.matched_move_line_ids:
             credit = aml.with_context(payment_group_id=payment_group_line.id).payment_group_matched_amount
             currency_amount = aml.with_context(payment_group_id=payment_group_line.id).payment_group_matched_amount
             debit = 0.0
-            if payment_group_line.currency_id.id != line_currency.id and payment_group_line.currency_rate:
-                credit = credit / payment_group_line.currency_rate
+            if payment_line_currency.id != line_currency.id and payment_group_line.manual_currency_rate:
+                credit = credit / payment_group_line.manual_currency_rate
             balance = debit - credit
 
             payment_total_debit += debit
@@ -655,8 +655,8 @@ class report_bi_partner_transaction(models.AbstractModel):
                 'footnotes': self.env.context['context_id']._get_footnotes('move_line_id', aml.id),
                 # 'footnotes':{},
                 'columns': [aml.date, payment_group_line.receiptbook_id.display_name, invoice_number, '',
-                            self._formatted(payment_group_line.currency_rate, 6),
-                            self._format(currency_amount, payment_group_line.currency_id),
+                            self._formatted(payment_group_line.manual_currency_rate, 6),
+                            self._format(currency_amount, payment_line_currency),
                             self._format(debit, line_currency),
                             self._format(credit, line_currency), self._format(balance, line_currency)],
                 'level': 1,
@@ -726,7 +726,7 @@ class partner_transection_context_report(models.TransientModel):
         return self.env['partner.transaction.report']
 
     def get_columns_names(self):
-        return [_("Date"), _("Doc Type"), _("Number"), _("Reference"), _("Exchange Rate"),_("Amount in Currency"), _("Debit"), _("Credit"), _("Balance")]
+        return [_("Date"), _("Doc Type"), _("Number"), _("Reference"), _("Manual Rate"),_("Amount in Currency"), _("Debit"), _("Credit"), _("Balance")]
 
     @api.multi
     def get_columns_types(self):
