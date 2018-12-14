@@ -43,7 +43,6 @@ msgstr "Moneda"
 #: model:ir.model.fields,field_description:inverse_exchange_rate_module.field_account_invoice_manual_currency_rate
 #: model:ir.model.fields,field_description:inverse_exchange_rate_module.field_account_payment_manual_currency_rate
 #: model:ir.model.fields,field_description:inverse_exchange_rate_module.field_res_currency_inverse_rate
-#: model:ir.model.fields,field_description:inverse_exchange_rate_module.field_res_currency_rate_inverse_rate
 msgid "Inverse Rate"
 msgstr "T.C. Manual"
 
